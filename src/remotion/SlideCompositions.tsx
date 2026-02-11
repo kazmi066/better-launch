@@ -10,14 +10,15 @@ import {
 import type { IntroSlide, TextSlide, ClipSlide, OutroSlide } from "../types";
 import { AnimatedText } from "./TextAnimations";
 import { TransitionWrapper } from "./Transitions";
-import { DiamondBackground, GridBackground } from "./Decorations";
+import { SlideBackground, GridBackground } from "./Decorations";
 
 export const IntroComposition: React.FC<{ slide: IntroSlide }> = ({
   slide,
 }) => {
   return (
     <AbsoluteFill>
-      <DiamondBackground
+      <SlideBackground
+        animation={slide.backgroundAnimation ?? "diamonds"}
         accentColor={slide.accentColor}
         backgroundColor={slide.backgroundColor}
       />

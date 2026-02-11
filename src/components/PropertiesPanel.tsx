@@ -1,7 +1,16 @@
 import React, { useCallback } from "react";
 import { useProjectStore } from "../store";
-import type { Slide, TransitionType, TextAnimation } from "../types";
-import { TRANSITION_OPTIONS, TEXT_ANIMATION_OPTIONS } from "../types";
+import type {
+  Slide,
+  TransitionType,
+  TextAnimation,
+  BackgroundAnimation,
+} from "../types";
+import {
+  TRANSITION_OPTIONS,
+  TEXT_ANIMATION_OPTIONS,
+  BACKGROUND_ANIMATION_OPTIONS,
+} from "../types";
 import { Upload, X } from "lucide-react";
 import { Input } from "./ui/input";
 import { Label } from "./ui/label";
@@ -163,6 +172,24 @@ const IntroProperties: React.FC<{
           </SelectTrigger>
           <SelectContent>
             {TEXT_ANIMATION_OPTIONS.map((o) => (
+              <SelectItem key={o.value} value={o.value}>
+                {o.label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </Field>
+      <Field label="Background Animation">
+        <Select
+          value={slide.backgroundAnimation ?? "diamonds"}
+          onValueChange={(v) =>
+            u({ backgroundAnimation: v as BackgroundAnimation })
+          }>
+          <SelectTrigger>
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {BACKGROUND_ANIMATION_OPTIONS.map((o) => (
               <SelectItem key={o.value} value={o.value}>
                 {o.label}
               </SelectItem>

@@ -13,6 +13,7 @@ const defaultIntro = (): Slide => ({
   subtitle: "Built for developers who ship fast",
   durationFrames: 150,
   textAnimation: "word-reveal",
+  backgroundAnimation: "diamonds",
   backgroundColor: "#09090b",
   textColor: "#fafafa",
   accentColor: "#6d28d9",
@@ -78,7 +79,7 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
   updateSlide: (id, patch) =>
     set((state) => ({
       slides: state.slides.map((s) =>
-        s.id === id ? ({ ...s, ...patch } as Slide) : s
+        s.id === id ? ({ ...s, ...patch } as Slide) : s,
       ),
     })),
 

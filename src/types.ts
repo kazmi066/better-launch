@@ -20,6 +20,14 @@ export type TextAnimation =
   | "scale-in"
   | "blur-in";
 
+export type BackgroundAnimation =
+  | "diamonds"
+  | "grid"
+  | "particles"
+  | "aurora"
+  | "ripple"
+  | "constellation";
+
 export type SlideType = "intro" | "text" | "clip" | "outro";
 
 export interface IntroSlide {
@@ -30,6 +38,7 @@ export interface IntroSlide {
   subtitle: string;
   durationFrames: number;
   textAnimation: TextAnimation;
+  backgroundAnimation: BackgroundAnimation;
   backgroundColor: string;
   textColor: string;
   accentColor: string;
@@ -97,6 +106,18 @@ export const TRANSITION_OPTIONS: { value: TransitionType; label: string }[] = [
   { value: "zoom-out", label: "Zoom Out" },
   { value: "wipe-left", label: "Wipe Left" },
   { value: "wipe-right", label: "Wipe Right" },
+];
+
+export const BACKGROUND_ANIMATION_OPTIONS: {
+  value: BackgroundAnimation;
+  label: string;
+}[] = [
+  { value: "diamonds", label: "Diamonds" },
+  { value: "grid", label: "Grid" },
+  { value: "particles", label: "Particles" },
+  { value: "aurora", label: "Aurora" },
+  { value: "ripple", label: "Ripple" },
+  { value: "constellation", label: "Constellation" },
 ];
 
 export const TEXT_ANIMATION_OPTIONS: {
