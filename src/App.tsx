@@ -473,7 +473,7 @@ function App() {
             <div className="flex items-center gap-2">
               <Clapperboard className="w-4 h-4 text-foreground" />
               <span className="text-sm font-semibold tracking-tight text-foreground">
-                BetterLaunch
+                BetterLaunchs
               </span>
             </div>
             <Separator orientation="vertical" className="h-4" />
