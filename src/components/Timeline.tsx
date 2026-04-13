@@ -1,14 +1,5 @@
-import React from "react";
-import {
-  Film,
-  Type,
-  Play,
-  Image,
-  Trash2,
-  ChevronUp,
-  ChevronDown,
-  Plus,
-} from "lucide-react";
+import React, { useState } from "react";
+import { Film, Type, Trash2, ChevronUp, ChevronDown, Plus } from "lucide-react";
 import { useProjectStore } from "../store";
 import type { Slide } from "../types";
 import { cn } from "../lib/utils";
@@ -17,85 +8,72 @@ import { Separator } from "./ui/separator";
 
 const slideIcon = (type: Slide["type"]) => {
   switch (type) {
-    case "intro":
-      return <Play className="w-3.5 h-3.5" />;
-    case "text":
+    case "standard":
       return <Type className="w-3.5 h-3.5" />;
-    case "clip":
+    case "video":
       return <Film className="w-3.5 h-3.5" />;
-    case "outro":
-      return <Image className="w-3.5 h-3.5" />;
   }
 };
 
 const slideLabel = (slide: Slide) => {
   switch (slide.type) {
-    case "intro":
-      return slide.productName || "Intro";
-    case "text":
-      return slide.heading || "Text Slide";
-    case "clip":
+    case "standard":
+      return slide.heading || "Standard Slide";
+    case "video":
       return slide.label || "Video Clip";
-    case "outro":
-      return slide.tagline || "Outro";
   }
 };
 
 const slideBorderColor = (type: Slide["type"]) => {
   switch (type) {
-    case "intro":
+    case "standard":
       return "border-l-white";
-    case "text":
-      return "border-l-[#888]";
-    case "clip":
+    case "video":
       return "border-l-[#0070f3]";
-    case "outro":
-      return "border-l-[#666]";
   }
 };
 
-export const Timeline: React.FC = () => {
+export const SlideList: React.FC = () => {
   const slides = useProjectStore((s) => s.slides);
   const selectedSlideId = useProjectStore((s) => s.selectedSlideId);
   const selectSlide = useProjectStore((s) => s.selectSlide);
   const removeSlide = useProjectStore((s) => s.removeSlide);
   const moveSlide = useProjectStore((s) => s.moveSlide);
-  const addTextSlide = useProjectStore((s) => s.addTextSlide);
-  const addClipSlide = useProjectStore((s) => s.addClipSlide);
-  const settings = useProjectStore((s) => s.settings);
+  const addStandardSlide = useProjectStore((s) => s.addStandardSlide);
+  const addVideoSlide = useProjectStore((s) => s.addVideoSlide);
 
-  const totalFrames = slides.reduce((s, sl) => s + sl.durationFrames, 0);
-  const totalSeconds = (totalFrames / settings.fps).toFixed(1);
+  const [showAddMenu, setShowAddMenu] = useState(false);
+
+  const totalSeconds = slides
+    .reduce((s, sl) => s + sl.durationSeconds, 0)
+    .toFixed(1);
 
   return (
     <div className="flex flex-col h-full">
       <div className="flex items-center justify-between px-4 py-3">
         <div>
-          <h2 className="text-[13px] font-semibold text-foreground">
-            Timeline
-          </h2>
+          <h2 className="text-[13px] font-semibold text-foreground">Slides</h2>
           <p className="text-[11px] text-muted-foreground">
-            {slides.length} slides · {totalSeconds}s
+            {slides.length} slide{slides.length !== 1 ? "s" : ""} ·{" "}
+            {totalSeconds}s
           </p>
         </div>
         <div className="flex gap-1">
           <Button
             variant="secondary"
             size="sm"
-            onClick={() => addTextSlide()}
-            className="h-7 text-[11px] gap-1"
-          >
+            onClick={() => addStandardSlide()}
+            className="h-7 text-[11px] gap-1">
             <Type className="w-3 h-3" />
-            Text
+            Standard
           </Button>
           <Button
             variant="secondary"
             size="sm"
-            onClick={() => addClipSlide()}
-            className="h-7 text-[11px] gap-1"
-          >
+            onClick={() => addVideoSlide()}
+            className="h-7 text-[11px] gap-1">
             <Film className="w-3 h-3" />
-            Clip
+            Video
           </Button>
         </div>
       </div>
@@ -105,15 +83,8 @@ export const Timeline: React.FC = () => {
       <div className="flex-1 overflow-y-auto p-2 space-y-0.5">
         {slides.map((slide, index) => {
           const isSelected = slide.id === selectedSlideId;
-          const canDelete = slide.type !== "intro" && slide.type !== "outro";
-          const canMoveUp =
-            index > 0 && !(index === 1 && slides[0]?.type === "intro");
-          const canMoveDown =
-            index < slides.length - 1 &&
-            !(
-              index === slides.length - 2 &&
-              slides[slides.length - 1]?.type === "outro"
-            );
+          const canMoveUp = index > 0;
+          const canMoveDown = index < slides.length - 1;
 
           return (
             <div
@@ -124,9 +95,8 @@ export const Timeline: React.FC = () => {
                 slideBorderColor(slide.type),
                 isSelected
                   ? "bg-secondary ring-1 ring-ring"
-                  : "hover:bg-secondary/50"
-              )}
-            >
+                  : "hover:bg-secondary/50",
+              )}>
               <div className="text-muted-foreground">
                 {slideIcon(slide.type)}
               </div>
@@ -135,8 +105,7 @@ export const Timeline: React.FC = () => {
                   {slideLabel(slide)}
                 </p>
                 <p className="text-[11px] text-muted-foreground capitalize">
-                  {slide.type} ·{" "}
-                  {(slide.durationFrames / settings.fps).toFixed(1)}s
+                  {slide.type} · {slide.durationSeconds.toFixed(1)}s
                 </p>
               </div>
 
@@ -147,8 +116,7 @@ export const Timeline: React.FC = () => {
                       e.stopPropagation();
                       moveSlide(index, index - 1);
                     }}
-                    className="p-1 rounded hover:bg-accent text-muted-foreground hover:text-foreground"
-                  >
+                    className="p-1 rounded hover:bg-accent text-muted-foreground hover:text-foreground">
                     <ChevronUp className="w-3 h-3" />
                   </button>
                 )}
@@ -158,22 +126,18 @@ export const Timeline: React.FC = () => {
                       e.stopPropagation();
                       moveSlide(index, index + 1);
                     }}
-                    className="p-1 rounded hover:bg-accent text-muted-foreground hover:text-foreground"
-                  >
+                    className="p-1 rounded hover:bg-accent text-muted-foreground hover:text-foreground">
                     <ChevronDown className="w-3 h-3" />
                   </button>
                 )}
-                {canDelete && (
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      removeSlide(slide.id);
-                    }}
-                    className="p-1 rounded hover:bg-destructive/20 text-muted-foreground hover:text-destructive"
-                  >
-                    <Trash2 className="w-3 h-3" />
-                  </button>
-                )}
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    removeSlide(slide.id);
+                  }}
+                  className="p-1 rounded hover:bg-destructive/20 text-muted-foreground hover:text-destructive">
+                  <Trash2 className="w-3 h-3" />
+                </button>
               </div>
             </div>
           );
@@ -182,16 +146,52 @@ export const Timeline: React.FC = () => {
 
       <Separator />
 
-      <div className="px-3 py-3">
+      <div className="px-3 py-3 relative">
         <Button
           variant="outline"
           size="sm"
-          onClick={() => addTextSlide()}
-          className="w-full h-8 text-[11px] border-dashed text-muted-foreground hover:text-foreground"
-        >
+          onClick={() => setShowAddMenu(!showAddMenu)}
+          className="w-full h-8 text-[11px] border-dashed text-muted-foreground hover:text-foreground">
           <Plus className="w-3 h-3 mr-1" />
           Add Slide
         </Button>
+
+        {showAddMenu && (
+          <div className="absolute bottom-14 left-3 right-3 bg-popover border border-border rounded-lg shadow-lg overflow-hidden z-10">
+            <button
+              onClick={() => {
+                addStandardSlide();
+                setShowAddMenu(false);
+              }}
+              className="w-full flex items-center gap-2.5 px-3 py-2.5 hover:bg-secondary transition-colors text-left">
+              <Type className="w-4 h-4 text-muted-foreground" />
+              <div>
+                <p className="text-[13px] font-medium text-foreground">
+                  Standard Slide
+                </p>
+                <p className="text-[10px] text-muted-foreground">
+                  Text with GSAP animations & custom background
+                </p>
+              </div>
+            </button>
+            <button
+              onClick={() => {
+                addVideoSlide();
+                setShowAddMenu(false);
+              }}
+              className="w-full flex items-center gap-2.5 px-3 py-2.5 hover:bg-secondary transition-colors text-left">
+              <Film className="w-4 h-4 text-muted-foreground" />
+              <div>
+                <p className="text-[13px] font-medium text-foreground">
+                  Video Slide
+                </p>
+                <p className="text-[10px] text-muted-foreground">
+                  Import a local video file
+                </p>
+              </div>
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );

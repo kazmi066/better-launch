@@ -1,17 +1,10 @@
-import React, {
-  useMemo,
-  useRef,
-  useCallback,
-  useState,
-  useEffect,
-} from "react";
-import { Player, type PlayerRef } from "@remotion/player";
+import React, { useRef, useCallback, useState } from "react";
 import { useProjectStore } from "./store";
 import type { ProjectSettings } from "./types";
-import { VideoComposition } from "./remotion/VideoComposition";
-import { Timeline } from "./components/Timeline";
+import { SlideList } from "./components/Timeline";
 import { PropertiesPanel } from "./components/PropertiesPanel";
-import { formatTime } from "./lib/utils";
+import { Preview, type PreviewHandle } from "./components/Preview";
+import { ExportRenderer } from "./components/ExportRenderer";
 import {
   Play,
   Pause,
@@ -50,11 +43,15 @@ import {
 } from "./components/ui/tooltip";
 import { exportVideo, downloadBlob, isWebCodecsSupported } from "./lib/export";
 
+// ── Types ────────────────────────────────────────────────────────────
+
 type ExportState =
   | { status: "idle" }
   | { status: "rendering"; percent: number; currentFrame: number }
   | { status: "done"; blob: Blob; duration: number }
   | { status: "error"; message: string };
+
+// ── Small sub-components ─────────────────────────────────────────────
 
 const StatCard: React.FC<{ label: string; value: string }> = ({
   label,
@@ -68,37 +65,13 @@ const StatCard: React.FC<{ label: string; value: string }> = ({
   </div>
 );
 
-const SeekBar: React.FC<{
-  currentFrame: number;
-  totalFrames: number;
-  fps: number;
-  onSeek: (e: React.ChangeEvent<HTMLInputElement>) => void;
-}> = ({ currentFrame, totalFrames, fps, onSeek }) => (
-  <div className="flex items-center gap-3 mt-3">
-    <span className="text-[11px] text-muted-foreground tabular-nums w-12 text-right">
-      {formatTime(currentFrame, fps)}
-    </span>
-    <input
-      type="range"
-      min={0}
-      max={Math.max(1, totalFrames - 1)}
-      value={currentFrame}
-      onChange={onSeek}
-      className="flex-1 h-1.5 appearance-none bg-secondary rounded-full cursor-pointer accent-foreground [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-3 [&::-webkit-slider-thumb]:h-3 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-foreground [&::-webkit-slider-thumb]:cursor-pointer"
-    />
-    <span className="text-[11px] text-muted-foreground tabular-nums w-12">
-      {formatTime(totalFrames, fps)}
-    </span>
-  </div>
-);
-
 const TransportControls: React.FC<{
   isPlaying: boolean;
   settings: ProjectSettings;
-  totalFrames: number;
+  totalSeconds: number;
   onTogglePlay: () => void;
   onRestart: () => void;
-}> = ({ isPlaying, settings, totalFrames, onTogglePlay, onRestart }) => (
+}> = ({ isPlaying, settings, totalSeconds, onTogglePlay, onRestart }) => (
   <div className="flex items-center justify-center gap-2 mt-2">
     <Tooltip>
       <TooltipTrigger asChild>
@@ -122,7 +95,7 @@ const TransportControls: React.FC<{
       <Monitor className="w-3.5 h-3.5" />
       <span>
         {settings.width}×{settings.height} · {settings.fps}fps ·{" "}
-        {(totalFrames / settings.fps).toFixed(1)}s
+        {totalSeconds.toFixed(1)}s
       </span>
     </div>
   </div>
@@ -224,11 +197,14 @@ const ExportStatusBanner: React.FC<{
   }
 };
 
+// ── Dialogs ──────────────────────────────────────────────────────────
+
 const ExportDialog: React.FC<{
   open: boolean;
   onOpenChange: (open: boolean) => void;
   settings: ProjectSettings;
   totalFrames: number;
+  totalSeconds: number;
   exportState: ExportState;
   onExport: () => void;
   onCancel: () => void;
@@ -239,6 +215,7 @@ const ExportDialog: React.FC<{
   onOpenChange,
   settings,
   totalFrames,
+  totalSeconds,
   exportState,
   onExport,
   onCancel,
@@ -263,10 +240,7 @@ const ExportDialog: React.FC<{
             value={`${settings.width}×${settings.height}`}
           />
           <StatCard label="Frame Rate" value={`${settings.fps} fps`} />
-          <StatCard
-            label="Duration"
-            value={`${(totalFrames / settings.fps).toFixed(1)}s`}
-          />
+          <StatCard label="Duration" value={`${totalSeconds.toFixed(1)}s`} />
           <StatCard label="Total Frames" value={String(totalFrames)} />
         </div>
         <div className="flex items-start gap-2 bg-secondary rounded-lg p-3">
@@ -355,58 +329,59 @@ const SettingsDialog: React.FC<{
   </Dialog>
 );
 
+// ── Main App ─────────────────────────────────────────────────────────
+
 function App() {
-  const slides = useProjectStore((s) => s.slides);
   const settings = useProjectStore((s) => s.settings);
   const setSettings = useProjectStore((s) => s.setSettings);
-  const playerRef = useRef<PlayerRef>(null);
-  const exportPlayerRef = useRef<PlayerRef>(null);
-  const exportContainerRef = useRef<HTMLDivElement>(null);
+  const isPlaying = useProjectStore((s) => s.isPlaying);
+  const setCurrentTime = useProjectStore((s) => s.setCurrentTime);
+
+  const previewRef = useRef<PreviewHandle>(null);
+  const exportRendererRef = useRef<HTMLDivElement>(null);
   const abortRef = useRef<AbortController | null>(null);
-  const [isPlaying, setIsPlaying] = useState(false);
+
   const [showExport, setShowExport] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [exportState, setExportState] = useState<ExportState>({
     status: "idle",
   });
-  const [currentFrame, setCurrentFrame] = useState(0);
-  const rafRef = useRef<number>(0);
 
-  useEffect(() => {
-    const poll = () => {
-      if (playerRef.current)
-        setCurrentFrame(playerRef.current.getCurrentFrame());
-      rafRef.current = requestAnimationFrame(poll);
-    };
-    rafRef.current = requestAnimationFrame(poll);
-    return () => cancelAnimationFrame(rafRef.current);
-  }, []);
+  const totalSeconds = useProjectStore((s) => s.totalDurationSeconds());
+  const totalFrames = useProjectStore((s) => s.totalDurationFrames());
 
-  const totalFrames = useMemo(
-    () => slides.reduce((sum, s) => sum + s.durationFrames, 0),
-    [slides],
-  );
+  const togglePlay = useCallback(() => {
+    if (isPlaying) {
+      previewRef.current?.pause();
+    } else {
+      previewRef.current?.play();
+    }
+  }, [isPlaying]);
 
-  const inputProps = useMemo(() => ({ slides }), [slides]);
+  const restart = useCallback(() => {
+    setCurrentTime(0);
+    previewRef.current?.play();
+  }, [setCurrentTime]);
 
   const handleExport = useCallback(async () => {
-    if (!exportPlayerRef.current || !exportContainerRef.current) return;
+    const container = exportRendererRef.current;
+    if (!container) return;
+
+    previewRef.current?.pause();
+
     const ac = new AbortController();
     abortRef.current = ac;
     setExportState({ status: "rendering", percent: 0, currentFrame: 0 });
     const startTime = Date.now();
+
     try {
-      exportPlayerRef.current.pause();
-      const playerContent = exportContainerRef.current.querySelector(
-        "[data-remotion-player-content]",
-      ) as HTMLElement | null;
       const blob = await exportVideo({
-        container: playerContent ?? exportContainerRef.current,
+        container,
         width: settings.width,
         height: settings.height,
         fps: settings.fps,
         totalFrames: Math.max(1, totalFrames),
-        seekTo: (frame) => exportPlayerRef.current?.seekTo(frame),
+        setTime: (seconds) => setCurrentTime(seconds),
         onProgress: (percent, cf) =>
           setExportState({ status: "rendering", percent, currentFrame: cf }),
         signal: ac.signal,
@@ -428,7 +403,7 @@ function App() {
     } finally {
       abortRef.current = null;
     }
-  }, [settings, totalFrames]);
+  }, [settings, totalFrames, setCurrentTime]);
 
   const cancelExport = useCallback(() => abortRef.current?.abort(), []);
 
@@ -436,25 +411,6 @@ function App() {
     if (exportState.status === "done")
       downloadBlob(exportState.blob, "launch-video.mp4");
   }, [exportState]);
-
-  const togglePlay = useCallback(() => {
-    if (!playerRef.current) return;
-    isPlaying ? playerRef.current.pause() : playerRef.current.play();
-    setIsPlaying(!isPlaying);
-  }, [isPlaying]);
-
-  const restart = useCallback(() => {
-    if (!playerRef.current) return;
-    playerRef.current.seekTo(0);
-    playerRef.current.play();
-    setIsPlaying(true);
-  }, []);
-
-  const handleSeek = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    const frame = Number(e.target.value);
-    playerRef.current?.seekTo(frame);
-    setCurrentFrame(frame);
-  }, []);
 
   const handleExportOpenChange = useCallback(
     (open: boolean) => {
@@ -502,92 +458,34 @@ function App() {
 
         <div className="flex-1 flex min-h-0">
           <div className="w-72 border-r border-border shrink-0 overflow-hidden bg-card">
-            <Timeline />
+            <SlideList />
           </div>
 
-          <div className="flex-1 flex flex-col min-w-0">
-            <div className="flex-1 flex items-center justify-center p-8 bg-background">
-              <div className="w-full max-w-4xl">
-                <div className="relative rounded-lg overflow-hidden border border-border bg-black">
-                  {totalFrames > 0 ? (
-                    <Player
-                      ref={playerRef}
-                      component={VideoComposition}
-                      inputProps={inputProps}
-                      durationInFrames={Math.max(1, totalFrames)}
-                      compositionWidth={settings.width}
-                      compositionHeight={settings.height}
-                      fps={settings.fps}
-                      style={{
-                        width: "100%",
-                        aspectRatio: `${settings.width} / ${settings.height}`,
-                      }}
-                      acknowledgeRemotionLicense
-                    />
-                  ) : (
-                    <div
-                      className="flex items-center justify-center bg-card text-muted-foreground text-sm"
-                      style={{
-                        aspectRatio: `${settings.width} / ${settings.height}`,
-                      }}>
-                      Add slides to preview your video
-                    </div>
-                  )}
-                </div>
-                {totalFrames > 0 && (
-                  <SeekBar
-                    currentFrame={currentFrame}
-                    totalFrames={totalFrames}
-                    fps={settings.fps}
-                    onSeek={handleSeek}
-                  />
-                )}
-                <TransportControls
-                  isPlaying={isPlaying}
-                  settings={settings}
-                  totalFrames={totalFrames}
-                  onTogglePlay={togglePlay}
-                  onRestart={restart}
-                />
-              </div>
-            </div>
-          </div>
+          <Preview ref={previewRef} />
 
           <div className="w-80 border-l border-border shrink-0 overflow-hidden bg-card">
             <PropertiesPanel />
           </div>
         </div>
 
-        {showExport && totalFrames > 0 && (
-          <div
-            ref={exportContainerRef}
-            style={{
-              position: "fixed",
-              left: "-99999px",
-              top: 0,
-              width: settings.width,
-              height: settings.height,
-              overflow: "hidden",
-            }}>
-            <Player
-              ref={exportPlayerRef}
-              component={VideoComposition}
-              inputProps={inputProps}
-              durationInFrames={Math.max(1, totalFrames)}
-              compositionWidth={settings.width}
-              compositionHeight={settings.height}
-              fps={settings.fps}
-              style={{ width: settings.width, height: settings.height }}
-              acknowledgeRemotionLicense
-            />
-          </div>
-        )}
+        <div className="border-t border-border bg-card px-4 py-2">
+          <TransportControls
+            isPlaying={isPlaying}
+            settings={settings}
+            totalSeconds={totalSeconds}
+            onTogglePlay={togglePlay}
+            onRestart={restart}
+          />
+        </div>
+
+        {showExport && <ExportRenderer ref={exportRendererRef} />}
 
         <ExportDialog
           open={showExport}
           onOpenChange={handleExportOpenChange}
           settings={settings}
           totalFrames={totalFrames}
+          totalSeconds={totalSeconds}
           exportState={exportState}
           onExport={handleExport}
           onCancel={cancelExport}

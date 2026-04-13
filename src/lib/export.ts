@@ -1,13 +1,15 @@
 import { Muxer, ArrayBufferTarget } from "mp4-muxer";
 import html2canvas from "html2canvas";
 
+// ── Public API ───────────────────────────────────────────────────────
+
 export interface ExportOptions {
   container: HTMLElement;
   width: number;
   height: number;
   fps: number;
   totalFrames: number;
-  seekTo: (frame: number) => void;
+  setTime: (seconds: number) => void;
   onProgress: (percent: number, currentFrame: number) => void;
   signal?: AbortSignal;
 }
@@ -17,6 +19,8 @@ export function isWebCodecsSupported(): boolean {
     typeof VideoEncoder !== "undefined" && typeof VideoFrame !== "undefined"
   );
 }
+
+// ── Internals ────────────────────────────────────────────────────────
 
 function getCodecString(width: number, height: number): string {
   const pixels = width * height;
@@ -134,6 +138,8 @@ function waitForRender(): Promise<void> {
   });
 }
 
+// ── Export pipeline ──────────────────────────────────────────────────
+
 export async function exportVideo(options: ExportOptions): Promise<Blob> {
   const {
     container,
@@ -141,7 +147,7 @@ export async function exportVideo(options: ExportOptions): Promise<Blob> {
     height,
     fps,
     totalFrames,
-    seekTo,
+    setTime,
     onProgress,
     signal,
   } = options;
@@ -182,7 +188,8 @@ export async function exportVideo(options: ExportOptions): Promise<Blob> {
         throw new DOMException("Export cancelled", "AbortError");
       if (encoderError) throw encoderError;
 
-      seekTo(frame);
+      const timeInSeconds = frame / fps;
+      setTime(timeInSeconds);
       await waitForRender();
 
       const canvas = await captureFrame(container, width, height);
@@ -213,6 +220,8 @@ export async function exportVideo(options: ExportOptions): Promise<Blob> {
     throw e;
   }
 }
+
+// ── Download helper ──────────────────────────────────────────────────
 
 export function downloadBlob(blob: Blob, filename: string) {
   const url = URL.createObjectURL(blob);

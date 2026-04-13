@@ -1,88 +1,86 @@
-export type TransitionType =
-  | "none"
-  | "fade"
-  | "slide-left"
-  | "slide-right"
-  | "slide-up"
-  | "slide-down"
-  | "zoom-in"
-  | "zoom-out"
-  | "wipe-left"
-  | "wipe-right";
+// ── Text animation types (GSAP-driven) ──────────────────────────────
+export type TextAnimationType = "fade-in" | "split-reveal" | "shutter-up";
 
-export type TextAnimation =
-  | "none"
-  | "fade-in"
-  | "typewriter"
-  | "word-reveal"
-  | "bounce-in"
-  | "slide-up"
-  | "scale-in"
-  | "blur-in";
+export const TEXT_ANIMATION_OPTIONS: {
+  value: TextAnimationType;
+  label: string;
+  description: string;
+}[] = [
+  {
+    value: "fade-in",
+    label: "Fade In",
+    description: "Smooth opacity fade with subtle upward drift",
+  },
+  {
+    value: "split-reveal",
+    label: "Split Reveal",
+    description: "Word-by-word staggered reveal",
+  },
+  {
+    value: "shutter-up",
+    label: "Shutter Up",
+    description: "Text slides up from behind a clip mask",
+  },
+];
 
-export type BackgroundAnimation =
-  | "diamonds"
-  | "grid"
-  | "particles"
-  | "aurora"
-  | "ripple"
-  | "constellation";
+// ── 9-point text position grid ───────────────────────────────────────
+export type TextPosition =
+  | "top-left"
+  | "top-center"
+  | "top-right"
+  | "middle-left"
+  | "middle-center"
+  | "middle-right"
+  | "bottom-left"
+  | "bottom-center"
+  | "bottom-right";
 
-export type SlideType = "intro" | "text" | "clip" | "outro";
+export const POSITION_OPTIONS: { value: TextPosition; label: string }[] = [
+  { value: "top-left", label: "Top Left" },
+  { value: "top-center", label: "Top Center" },
+  { value: "top-right", label: "Top Right" },
+  { value: "middle-left", label: "Middle Left" },
+  { value: "middle-center", label: "Middle Center" },
+  { value: "middle-right", label: "Middle Right" },
+  { value: "bottom-left", label: "Bottom Left" },
+  { value: "bottom-center", label: "Bottom Center" },
+  { value: "bottom-right", label: "Bottom Right" },
+];
 
-export interface IntroSlide {
-  type: "intro";
-  id: string;
-  productName: string;
-  tagline: string;
-  subtitle: string;
-  durationFrames: number;
-  textAnimation: TextAnimation;
-  backgroundAnimation: BackgroundAnimation;
-  backgroundColor: string;
-  textColor: string;
-  accentColor: string;
-}
+// ── Background types ─────────────────────────────────────────────────
+export type BackgroundType = "color" | "image" | "video";
 
-export interface TextSlide {
-  type: "text";
+// ── Slide types ──────────────────────────────────────────────────────
+export interface StandardSlide {
+  type: "standard";
   id: string;
   heading: string;
   subheading: string;
-  durationFrames: number;
-  textAnimation: TextAnimation;
-  backgroundColor: string;
+  textAnimation: TextAnimationType;
+  textPosition: TextPosition;
   textColor: string;
-  accentColor: string;
-  transition: TransitionType;
+  fontSize: number;
+  backgroundType: BackgroundType;
+  backgroundColor: string;
+  backgroundImageUrl: string;
+  backgroundImageFileName: string;
+  backgroundVideoUrl: string;
+  backgroundVideoFileName: string;
+  durationSeconds: number;
 }
 
-export interface ClipSlide {
-  type: "clip";
+export interface VideoSlide {
+  type: "video";
   id: string;
   label: string;
   videoUrl: string;
   videoFileName: string;
-  durationFrames: number;
-  transition: TransitionType;
-  zoomEffect: boolean;
+  durationSeconds: number;
 }
 
-export interface OutroSlide {
-  type: "outro";
-  id: string;
-  logoUrl: string;
-  logoFileName: string;
-  tagline: string;
-  durationFrames: number;
-  textAnimation: TextAnimation;
-  backgroundColor: string;
-  textColor: string;
-  accentColor: string;
-}
+export type Slide = StandardSlide | VideoSlide;
 
-export type Slide = IntroSlide | TextSlide | ClipSlide | OutroSlide;
-
+// ── Project settings ─────────────────────────────────────────────────
 export interface ProjectSettings {
   fps: number;
   width: number;
@@ -94,42 +92,3 @@ export const DEFAULT_SETTINGS: ProjectSettings = {
   width: 1920,
   height: 1080,
 };
-
-export const TRANSITION_OPTIONS: { value: TransitionType; label: string }[] = [
-  { value: "none", label: "None" },
-  { value: "fade", label: "Fade" },
-  { value: "slide-left", label: "Slide Left" },
-  { value: "slide-right", label: "Slide Right" },
-  { value: "slide-up", label: "Slide Up" },
-  { value: "slide-down", label: "Slide Down" },
-  { value: "zoom-in", label: "Zoom In" },
-  { value: "zoom-out", label: "Zoom Out" },
-  { value: "wipe-left", label: "Wipe Left" },
-  { value: "wipe-right", label: "Wipe Right" },
-];
-
-export const BACKGROUND_ANIMATION_OPTIONS: {
-  value: BackgroundAnimation;
-  label: string;
-}[] = [
-  { value: "diamonds", label: "Diamonds" },
-  { value: "grid", label: "Grid" },
-  { value: "particles", label: "Particles" },
-  { value: "aurora", label: "Aurora" },
-  { value: "ripple", label: "Ripple" },
-  { value: "constellation", label: "Constellation" },
-];
-
-export const TEXT_ANIMATION_OPTIONS: {
-  value: TextAnimation;
-  label: string;
-}[] = [
-  { value: "none", label: "None" },
-  { value: "fade-in", label: "Fade In" },
-  { value: "typewriter", label: "Typewriter" },
-  { value: "word-reveal", label: "Word Reveal" },
-  { value: "bounce-in", label: "Bounce In" },
-  { value: "slide-up", label: "Slide Up" },
-  { value: "scale-in", label: "Scale In" },
-  { value: "blur-in", label: "Blur In" },
-];

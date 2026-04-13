@@ -1,42 +1,60 @@
 import { create } from "zustand";
-import type { Slide, ProjectSettings } from "./types";
+import type {
+  Slide,
+  StandardSlide,
+  VideoSlide,
+  ProjectSettings,
+} from "./types";
 import { DEFAULT_SETTINGS } from "./types";
 
 let idCounter = 0;
 export const newId = () => `slide-${++idCounter}-${Date.now()}`;
 
-const defaultIntro = (): Slide => ({
-  type: "intro",
-  id: newId(),
-  productName: "Your Product",
-  tagline: "The future starts here",
-  subtitle: "Built for developers who ship fast",
-  durationFrames: 150,
-  textAnimation: "word-reveal",
-  backgroundAnimation: "diamonds",
-  backgroundColor: "#09090b",
-  textColor: "#fafafa",
-  accentColor: "#6d28d9",
-});
+// ── Default slide factories ──────────────────────────────────────────
 
-const defaultOutro = (): Slide => ({
-  type: "outro",
-  id: newId(),
-  logoUrl: "",
-  logoFileName: "",
-  tagline: "Try it today.",
-  durationFrames: 120,
-  textAnimation: "fade-in",
-  backgroundColor: "#09090b",
-  textColor: "#fafafa",
-  accentColor: "#6d28d9",
-});
+export function createStandardSlide(
+  overrides?: Partial<StandardSlide>,
+): StandardSlide {
+  return {
+    type: "standard",
+    id: newId(),
+    heading: "Your Heading Here",
+    subheading: "",
+    textAnimation: "split-reveal",
+    textPosition: "middle-center",
+    textColor: "#ffffff",
+    fontSize: 64,
+    backgroundType: "color",
+    backgroundColor: "#09090b",
+    backgroundImageUrl: "",
+    backgroundImageFileName: "",
+    backgroundVideoUrl: "",
+    backgroundVideoFileName: "",
+    durationSeconds: 4,
+    ...overrides,
+  };
+}
+
+export function createVideoSlide(overrides?: Partial<VideoSlide>): VideoSlide {
+  return {
+    type: "video",
+    id: newId(),
+    label: "Video Clip",
+    videoUrl: "",
+    videoFileName: "",
+    durationSeconds: 0,
+    ...overrides,
+  };
+}
+
+// ── Store ────────────────────────────────────────────────────────────
 
 interface ProjectStore {
   slides: Slide[];
   settings: ProjectSettings;
   selectedSlideId: string | null;
   isPlaying: boolean;
+  currentTime: number;
 
   setSlides: (slides: Slide[]) => void;
   addSlide: (slide: Slide, afterIndex?: number) => void;
@@ -46,17 +64,26 @@ interface ProjectStore {
   selectSlide: (id: string | null) => void;
   setSettings: (settings: Partial<ProjectSettings>) => void;
   setIsPlaying: (playing: boolean) => void;
+  setCurrentTime: (time: number) => void;
+
+  totalDurationSeconds: () => number;
   totalDurationFrames: () => number;
 
-  addTextSlide: (afterIndex?: number) => void;
-  addClipSlide: (afterIndex?: number) => void;
+  addStandardSlide: (afterIndex?: number) => void;
+  addVideoSlide: (afterIndex?: number) => void;
 }
 
 export const useProjectStore = create<ProjectStore>((set, get) => ({
-  slides: [defaultIntro(), defaultOutro()],
+  slides: [
+    createStandardSlide({
+      heading: "Your Product",
+      subheading: "The future starts here",
+    }),
+  ],
   settings: DEFAULT_SETTINGS,
   selectedSlideId: null,
   isPlaying: false,
+  currentTime: 0,
 
   setSlides: (slides) => set({ slides }),
 
@@ -66,12 +93,7 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
       if (afterIndex !== undefined && afterIndex >= 0) {
         newSlides.splice(afterIndex + 1, 0, slide);
       } else {
-        const outroIdx = newSlides.findIndex((s) => s.type === "outro");
-        if (outroIdx >= 0) {
-          newSlides.splice(outroIdx, 0, slide);
-        } else {
-          newSlides.push(slide);
-        }
+        newSlides.push(slide);
       }
       return { slides: newSlides, selectedSlideId: slide.id };
     }),
@@ -84,15 +106,11 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
     })),
 
   removeSlide: (id) =>
-    set((state) => {
-      const slide = state.slides.find((s) => s.id === id);
-      if (slide?.type === "intro" || slide?.type === "outro") return state;
-      return {
-        slides: state.slides.filter((s) => s.id !== id),
-        selectedSlideId:
-          state.selectedSlideId === id ? null : state.selectedSlideId,
-      };
-    }),
+    set((state) => ({
+      slides: state.slides.filter((s) => s.id !== id),
+      selectedSlideId:
+        state.selectedSlideId === id ? null : state.selectedSlideId,
+    })),
 
   moveSlide: (fromIndex, toIndex) =>
     set((state) => {
@@ -110,36 +128,21 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
 
   setIsPlaying: (playing) => set({ isPlaying: playing }),
 
-  totalDurationFrames: () =>
-    get().slides.reduce((sum, s) => sum + s.durationFrames, 0),
+  setCurrentTime: (time) => set({ currentTime: time }),
 
-  addTextSlide: (afterIndex) => {
-    const slide: Slide = {
-      type: "text",
-      id: newId(),
-      heading: "Your Heading Here",
-      subheading: "",
-      durationFrames: 90,
-      textAnimation: "word-reveal",
-      backgroundColor: "#18181b",
-      textColor: "#fafafa",
-      accentColor: "#6d28d9",
-      transition: "fade",
-    };
-    get().addSlide(slide, afterIndex);
+  totalDurationSeconds: () =>
+    get().slides.reduce((sum, s) => sum + s.durationSeconds, 0),
+
+  totalDurationFrames: () => {
+    const { fps } = get().settings;
+    return Math.round(get().totalDurationSeconds() * fps);
   },
 
-  addClipSlide: (afterIndex) => {
-    const slide: Slide = {
-      type: "clip",
-      id: newId(),
-      label: "Demo Clip",
-      videoUrl: "",
-      videoFileName: "",
-      durationFrames: 150,
-      transition: "fade",
-      zoomEffect: true,
-    };
-    get().addSlide(slide, afterIndex);
+  addStandardSlide: (afterIndex) => {
+    get().addSlide(createStandardSlide(), afterIndex);
+  },
+
+  addVideoSlide: (afterIndex) => {
+    get().addSlide(createVideoSlide(), afterIndex);
   },
 }));
