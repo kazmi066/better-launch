@@ -4,7 +4,7 @@ import { getActiveSlide } from "../engine/renderer";
 import { StandardSlidePreview } from "./preview/StandardSlidePreview";
 import { VideoSlidePreview } from "./preview/VideoSlidePreview";
 
-const PREVIEW_REFERENCE_WIDTH = 960;
+const LOGICAL_REFERENCE_SIZE = 960;
 
 export const ExportRenderer = forwardRef<HTMLDivElement>((_props, ref) => {
   const slides = useProjectStore((s) => s.slides);
@@ -12,19 +12,27 @@ export const ExportRenderer = forwardRef<HTMLDivElement>((_props, ref) => {
   const currentTime = useProjectStore((s) => s.currentTime);
 
   const active = getActiveSlide(slides, currentTime);
-  const exportScale = settings.width / PREVIEW_REFERENCE_WIDTH;
+  const isLandscape = settings.width >= settings.height;
+  const logicalWidth = isLandscape
+    ? LOGICAL_REFERENCE_SIZE
+    : (LOGICAL_REFERENCE_SIZE * settings.width) / settings.height;
+  const logicalHeight = isLandscape
+    ? (LOGICAL_REFERENCE_SIZE * settings.height) / settings.width
+    : LOGICAL_REFERENCE_SIZE;
 
   return (
     <div
       ref={ref}
       style={{
         position: "fixed",
-        left: "-99999px",
+        left: 0,
         top: 0,
-        width: settings.width,
-        height: settings.height,
+        width: logicalWidth,
+        height: logicalHeight,
         overflow: "hidden",
         background: "#000000",
+        pointerEvents: "none",
+        zIndex: -1,
       }}>
       {active && active.slide.type === "standard" && (
         <StandardSlidePreview
@@ -32,7 +40,6 @@ export const ExportRenderer = forwardRef<HTMLDivElement>((_props, ref) => {
           slide={active.slide}
           progress={active.localProgress}
           isExporting
-          exportScale={exportScale}
         />
       )}
       {active && active.slide.type === "video" && (

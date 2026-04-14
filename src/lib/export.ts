@@ -63,13 +63,23 @@ function drawVideoToCanvas(
 
 async function captureFrame(
   container: HTMLElement,
-  width: number,
-  height: number,
+  outputWidth: number,
+  outputHeight: number,
 ): Promise<HTMLCanvasElement> {
-  return html2canvas(container, {
-    width,
-    height,
-    scale: 1,
+  const logicalWidth = Math.max(
+    1,
+    Math.round(container.getBoundingClientRect().width),
+  );
+  const logicalHeight = Math.max(
+    1,
+    Math.round(container.getBoundingClientRect().height),
+  );
+  const scale = outputWidth / logicalWidth;
+
+  const captured = await html2canvas(container, {
+    width: logicalWidth,
+    height: logicalHeight,
+    scale,
     useCORS: true,
     allowTaint: true,
     backgroundColor: "#000000",
@@ -113,6 +123,22 @@ async function captureFrame(
       });
     },
   });
+
+  if (captured.width === outputWidth && captured.height === outputHeight) {
+    return captured;
+  }
+
+  const normalized = document.createElement("canvas");
+  normalized.width = outputWidth;
+  normalized.height = outputHeight;
+  const ctx = normalized.getContext("2d");
+
+  if (!ctx) {
+    return captured;
+  }
+
+  ctx.drawImage(captured, 0, 0, outputWidth, outputHeight);
+  return normalized;
 }
 
 function waitForEncoderDrain(encoder: VideoEncoder): Promise<void> {

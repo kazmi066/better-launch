@@ -8,14 +8,12 @@ interface Props {
   slide: StandardSlide;
   progress: number;
   isExporting?: boolean;
-  exportScale?: number;
 }
 
 export const StandardSlidePreview: React.FC<Props> = ({
   slide,
   progress,
   isExporting = false,
-  exportScale = 1,
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const headingRef = useRef<HTMLDivElement>(null);
@@ -63,7 +61,7 @@ export const StandardSlidePreview: React.FC<Props> = ({
       prevSubheading.current = slide.subheading;
 
       if (isExporting) {
-        // Defer during export to ensure DOM is fully laid out with scaled fonts
+        // Defer during export to ensure DOM/layout is fully settled
         requestAnimationFrame(() => {
           requestAnimationFrame(() => {
             buildTimeline();
@@ -108,15 +106,8 @@ export const StandardSlidePreview: React.FC<Props> = ({
     backgroundStyle.backgroundColor = slide.backgroundColor;
   }
 
-  const headingFontSize = isExporting
-    ? slide.fontSize * exportScale
-    : slide.fontSize;
-  const subheadingFontSize = isExporting
-    ? Math.round(slide.fontSize * 0.45 * exportScale)
-    : Math.round(slide.fontSize * 0.45);
-  const subheadingMarginTop = isExporting
-    ? Math.round(slide.fontSize * 0.25 * exportScale)
-    : Math.round(slide.fontSize * 0.25);
+  const subheadingFontSize = Math.round(slide.fontSize * 0.45);
+  const subheadingMarginTop = Math.round(slide.fontSize * 0.25);
 
   return (
     <div
@@ -147,7 +138,7 @@ export const StandardSlidePreview: React.FC<Props> = ({
           ref={headingRef}
           style={{
             color: slide.textColor,
-            fontSize: `${headingFontSize}px`,
+            fontSize: `${slide.fontSize}px`,
             fontWeight: 700,
             lineHeight: 1.1,
             letterSpacing: "-0.02em",

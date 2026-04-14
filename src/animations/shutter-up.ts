@@ -15,11 +15,6 @@ function wrapInMask(el: HTMLElement): HTMLElement {
   mask.appendChild(inner);
   el.appendChild(mask);
 
-  // Force reflow then set explicit height on mask based on content
-  void el.offsetHeight;
-  const contentHeight = inner.offsetHeight;
-  mask.style.height = `${contentHeight}px`;
-
   return inner;
 }
 
@@ -28,20 +23,17 @@ export const shutterUp: AnimationFactory = ({ headingEl, subheadingEl }) => {
 
   if (headingEl) {
     const inner = wrapInMask(headingEl);
-    tl.fromTo(
-      inner,
-      { y: "100%" },
-      { y: "0%", duration: 0.7, ease: "power3.out" },
-      0,
-    );
+    const h = inner.offsetHeight;
+    tl.fromTo(inner, { y: h }, { y: 0, duration: 0.7, ease: "power3.out" }, 0);
   }
 
   if (subheadingEl) {
     const inner = wrapInMask(subheadingEl);
+    const h = inner.offsetHeight;
     tl.fromTo(
       inner,
-      { y: "100%" },
-      { y: "0%", duration: 0.6, ease: "power3.out" },
+      { y: h },
+      { y: 0, duration: 0.6, ease: "power3.out" },
       0.25,
     );
   }
