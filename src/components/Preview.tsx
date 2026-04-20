@@ -7,8 +7,7 @@ import React, {
 } from "react";
 import { useProjectStore } from "../store";
 import { getActiveSlide } from "../engine/renderer";
-import { StandardSlidePreview } from "./preview/StandardSlidePreview";
-import { VideoSlidePreview } from "./preview/VideoSlidePreview";
+import { SlideCanvas } from "./preview/SlideCanvas";
 import { formatTime } from "../lib/utils";
 
 export interface PreviewHandle {
@@ -85,23 +84,14 @@ export const Preview = forwardRef<PreviewHandle>((_props, ref) => {
               ref={containerRef}
               className="absolute inset-0"
               style={{ width: "100%", height: "100%" }}>
-              {active && active.slide.type === "standard" && (
-                <StandardSlidePreview
-                  key={active.slide.id}
-                  slide={active.slide}
-                  progress={active.localProgress}
-                />
-              )}
-              {active && active.slide.type === "video" && (
-                <VideoSlidePreview
-                  key={active.slide.id}
-                  slide={active.slide}
-                  progress={active.localProgress}
-                  isPlaying={isPlaying}
-                />
-              )}
+              <SlideCanvas
+                slide={active ? active.slide : null}
+                localTime={active ? active.localTime : 0}
+                settings={settings}
+                isPlaying={isPlaying}
+              />
               {!active && (
-                <div className="absolute inset-0 flex items-center justify-center text-muted-foreground text-sm">
+                <div className="absolute inset-0 flex items-center justify-center text-muted-foreground text-sm pointer-events-none">
                   Add slides to preview your video
                 </div>
               )}

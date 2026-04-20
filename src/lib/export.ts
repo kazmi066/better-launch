@@ -1,15 +1,17 @@
 import { Muxer, ArrayBufferTarget } from "mp4-muxer";
-import html2canvas from "html2canvas";
-
-// ── Public API ───────────────────────────────────────────────────────
+import type { ProjectSettings, Slide } from "../types";
+import { getActiveSlide } from "../engine/renderer";
+import { renderScene } from "./scene";
+import {
+  ensureImageLoaded,
+  getOrCreateVideo,
+  seekVideo,
+  waitForVideoReady,
+} from "./media-cache";
 
 export interface ExportOptions {
-  container: HTMLElement;
-  width: number;
-  height: number;
-  fps: number;
-  totalFrames: number;
-  setTime: (seconds: number) => void;
+  slides: Slide[];
+  settings: ProjectSettings;
   onProgress: (percent: number, currentFrame: number) => void;
   signal?: AbortSignal;
 }
@@ -20,125 +22,11 @@ export function isWebCodecsSupported(): boolean {
   );
 }
 
-// ── Internals ────────────────────────────────────────────────────────
-
 function getCodecString(width: number, height: number): string {
   const pixels = width * height;
   if (pixels > 2073600) return "avc1.640033";
   if (pixels > 921600) return "avc1.640028";
   return "avc1.64001f";
-}
-
-function drawVideoToCanvas(
-  ctx: CanvasRenderingContext2D,
-  video: HTMLVideoElement,
-  cssW: number,
-  cssH: number,
-  fit: string,
-) {
-  const vw = video.videoWidth;
-  const vh = video.videoHeight;
-
-  switch (fit) {
-    case "contain": {
-      const scale = Math.min(cssW / vw, cssH / vh);
-      const dw = vw * scale;
-      const dh = vh * scale;
-      ctx.fillStyle = "#000";
-      ctx.fillRect(0, 0, cssW, cssH);
-      ctx.drawImage(video, (cssW - dw) / 2, (cssH - dh) / 2, dw, dh);
-      break;
-    }
-    case "cover": {
-      const scale = Math.max(cssW / vw, cssH / vh);
-      const dw = vw * scale;
-      const dh = vh * scale;
-      ctx.drawImage(video, (cssW - dw) / 2, (cssH - dh) / 2, dw, dh);
-      break;
-    }
-    default:
-      ctx.drawImage(video, 0, 0, cssW, cssH);
-  }
-}
-
-async function captureFrame(
-  container: HTMLElement,
-  outputWidth: number,
-  outputHeight: number,
-): Promise<HTMLCanvasElement> {
-  const logicalWidth = Math.max(
-    1,
-    Math.round(container.getBoundingClientRect().width),
-  );
-  const logicalHeight = Math.max(
-    1,
-    Math.round(container.getBoundingClientRect().height),
-  );
-  const scale = outputWidth / logicalWidth;
-
-  const captured = await html2canvas(container, {
-    width: logicalWidth,
-    height: logicalHeight,
-    scale,
-    useCORS: true,
-    allowTaint: true,
-    backgroundColor: "#000000",
-    logging: false,
-    onclone: (_clonedDoc: Document, clonedEl: HTMLElement) => {
-      const originalVideos = container.querySelectorAll("video");
-      const clonedVideos = clonedEl.querySelectorAll("video");
-
-      originalVideos.forEach((video, i) => {
-        const clonedVideo = clonedVideos[i];
-        if (!clonedVideo || video.readyState < 2) return;
-
-        const styles = window.getComputedStyle(clonedVideo);
-        const cssW = parseFloat(styles.width);
-        const cssH = parseFloat(styles.height);
-
-        const c = document.createElement("canvas");
-        c.width = cssW;
-        c.height = cssH;
-        c.style.width = styles.width;
-        c.style.height = styles.height;
-        c.style.position = styles.position;
-        c.style.top = styles.top;
-        c.style.left = styles.left;
-        c.style.right = styles.right;
-        c.style.bottom = styles.bottom;
-        c.style.display = styles.display;
-
-        const ctx = c.getContext("2d");
-        if (ctx) {
-          drawVideoToCanvas(
-            ctx,
-            video,
-            cssW,
-            cssH,
-            styles.objectFit || "contain",
-          );
-        }
-
-        clonedVideo.parentElement?.replaceChild(c, clonedVideo);
-      });
-    },
-  });
-
-  if (captured.width === outputWidth && captured.height === outputHeight) {
-    return captured;
-  }
-
-  const normalized = document.createElement("canvas");
-  normalized.width = outputWidth;
-  normalized.height = outputHeight;
-  const ctx = normalized.getContext("2d");
-
-  if (!ctx) {
-    return captured;
-  }
-
-  ctx.drawImage(captured, 0, 0, outputWidth, outputHeight);
-  return normalized;
 }
 
 function waitForEncoderDrain(encoder: VideoEncoder): Promise<void> {
@@ -154,35 +42,84 @@ function waitForEncoderDrain(encoder: VideoEncoder): Promise<void> {
   });
 }
 
-function waitForRender(): Promise<void> {
-  return new Promise((resolve) => {
-    requestAnimationFrame(() => {
-      requestAnimationFrame(() => {
-        setTimeout(resolve, 50);
-      });
-    });
-  });
+async function preloadMedia(slides: Slide[]): Promise<void> {
+  const imagePromises: Promise<unknown>[] = [];
+  const videoPromises: Promise<unknown>[] = [];
+
+  for (const slide of slides) {
+    if (slide.type === "standard") {
+      if (slide.backgroundType === "image" && slide.backgroundImageUrl) {
+        imagePromises.push(
+          ensureImageLoaded(slide.backgroundImageUrl).catch(() => {}),
+        );
+      }
+      if (slide.backgroundType === "video" && slide.backgroundVideoUrl) {
+        const v = getOrCreateVideo(slide.backgroundVideoUrl);
+        v.pause();
+        videoPromises.push(waitForVideoReady(v).catch(() => {}));
+      }
+    }
+    if (slide.type === "video" && slide.videoUrl) {
+      const v = getOrCreateVideo(slide.videoUrl);
+      v.pause();
+      videoPromises.push(waitForVideoReady(v).catch(() => {}));
+    }
+  }
+
+  await Promise.all([...imagePromises, ...videoPromises]);
 }
 
-// ── Export pipeline ──────────────────────────────────────────────────
+async function syncVideoFrames(
+  slides: Slide[],
+  currentTime: number,
+): Promise<void> {
+  const active = getActiveSlide(slides, currentTime);
+  if (!active) return;
+
+  const seeks: Promise<void>[] = [];
+
+  if (active.slide.type === "standard") {
+    if (
+      active.slide.backgroundType === "video" &&
+      active.slide.backgroundVideoUrl
+    ) {
+      const v = getOrCreateVideo(active.slide.backgroundVideoUrl);
+      if (v.readyState >= 2 && Number.isFinite(v.duration) && v.duration > 0) {
+        const t = active.localTime % v.duration;
+        seeks.push(seekVideo(v, t).catch(() => {}));
+      }
+    }
+  } else if (active.slide.type === "video" && active.slide.videoUrl) {
+    const v = getOrCreateVideo(active.slide.videoUrl);
+    if (v.readyState >= 2 && Number.isFinite(v.duration) && v.duration > 0) {
+      const t = Math.min(active.localTime, v.duration);
+      seeks.push(seekVideo(v, t).catch(() => {}));
+    }
+  }
+
+  await Promise.all(seeks);
+}
 
 export async function exportVideo(options: ExportOptions): Promise<Blob> {
-  const {
-    container,
-    width,
-    height,
-    fps,
-    totalFrames,
-    setTime,
-    onProgress,
-    signal,
-  } = options;
+  const { slides, settings, onProgress, signal } = options;
+  const { width, height, fps } = settings;
 
   if (!isWebCodecsSupported()) {
     throw new Error(
       "Your browser does not support WebCodecs. Please use Chrome 94+ or Edge 94+ for video export.",
     );
   }
+
+  const totalSeconds = slides.reduce((s, sl) => s + sl.durationSeconds, 0);
+  const totalFrames = Math.max(1, Math.round(totalSeconds * fps));
+
+  const canvas = document.createElement("canvas");
+  canvas.width = width;
+  canvas.height = height;
+  const ctx = canvas.getContext("2d", { alpha: false });
+  if (!ctx) throw new Error("Failed to acquire 2D context for export");
+
+  await preloadMedia(slides);
 
   const muxer = new Muxer({
     target: new ArrayBufferTarget(),
@@ -208,17 +145,25 @@ export async function exportVideo(options: ExportOptions): Promise<Blob> {
     framerate: fps,
   });
 
+  const size = { width, height };
+
   try {
     for (let frame = 0; frame < totalFrames; frame++) {
       if (signal?.aborted)
         throw new DOMException("Export cancelled", "AbortError");
       if (encoderError) throw encoderError;
 
-      const timeInSeconds = frame / fps;
-      setTime(timeInSeconds);
-      await waitForRender();
+      const t = frame / fps;
+      const active = getActiveSlide(slides, t);
 
-      const canvas = await captureFrame(container, width, height);
+      await syncVideoFrames(slides, t);
+      renderScene(
+        ctx,
+        active ? active.slide : null,
+        active ? active.localTime : 0,
+        size,
+      );
+
       const videoFrame = new VideoFrame(canvas, {
         timestamp: Math.round(frame * (1_000_000 / fps)),
         duration: Math.round(1_000_000 / fps),
@@ -242,12 +187,12 @@ export async function exportVideo(options: ExportOptions): Promise<Blob> {
   } catch (e) {
     try {
       encoder.close();
-    } catch {}
+    } catch {
+      /* noop */
+    }
     throw e;
   }
 }
-
-// ── Download helper ──────────────────────────────────────────────────
 
 export function downloadBlob(blob: Blob, filename: string) {
   const url = URL.createObjectURL(blob);

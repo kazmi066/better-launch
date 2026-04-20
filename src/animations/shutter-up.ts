@@ -1,42 +1,55 @@
-import gsap from "gsap";
-import type { AnimationFactory } from "./types";
+import { clamp, easeOutPower3 } from "../lib/easing";
+import { drawTextBlock } from "../lib/text-draw";
+import type { AnimationFactory, AnimationRenderContext } from "./types";
 
-function wrapInMask(el: HTMLElement): HTMLElement {
-  const mask = document.createElement("div");
-  mask.style.overflow = "hidden";
-  mask.style.display = "inline-block";
-  mask.style.width = "100%";
+const HEADING_END = 0.7 / 0.85;
+const SUB_START = 0.25 / 0.85;
 
-  const inner = document.createElement("div");
-  inner.style.display = "block";
-  inner.innerHTML = el.innerHTML;
-  el.innerHTML = "";
+export const shutterUp: AnimationFactory = () => ({
+  render(ctx: AnimationRenderContext) {
+    const {
+      ctx: c,
+      heading,
+      subheading,
+      headingX,
+      headingY,
+      subheadingX,
+      subheadingY,
+      textAlign,
+      textColor,
+      progress,
+    } = ctx;
 
-  mask.appendChild(inner);
-  el.appendChild(mask);
+    const ph = easeOutPower3(clamp(progress / HEADING_END));
+    drawTextBlock(c, heading, {
+      x: headingX,
+      y: headingY + (1 - ph) * heading.totalHeight,
+      color: textColor,
+      alpha: 1,
+      align: textAlign,
+      clip: {
+        x: headingX,
+        y: headingY,
+        width: heading.totalWidth,
+        height: heading.totalHeight,
+      },
+    });
 
-  return inner;
-}
-
-export const shutterUp: AnimationFactory = ({ headingEl, subheadingEl }) => {
-  const tl = gsap.timeline({ paused: true });
-
-  if (headingEl) {
-    const inner = wrapInMask(headingEl);
-    const h = inner.offsetHeight;
-    tl.fromTo(inner, { y: h }, { y: 0, duration: 0.7, ease: "power3.out" }, 0);
-  }
-
-  if (subheadingEl) {
-    const inner = wrapInMask(subheadingEl);
-    const h = inner.offsetHeight;
-    tl.fromTo(
-      inner,
-      { y: h },
-      { y: 0, duration: 0.6, ease: "power3.out" },
-      0.25,
-    );
-  }
-
-  return tl;
-};
+    if (subheading) {
+      const ps = easeOutPower3(clamp((progress - SUB_START) / (1 - SUB_START)));
+      drawTextBlock(c, subheading, {
+        x: subheadingX,
+        y: subheadingY + (1 - ps) * subheading.totalHeight,
+        color: textColor,
+        alpha: 0.7,
+        align: textAlign,
+        clip: {
+          x: subheadingX,
+          y: subheadingY,
+          width: subheading.totalWidth,
+          height: subheading.totalHeight,
+        },
+      });
+    }
+  },
+});

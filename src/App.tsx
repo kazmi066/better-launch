@@ -4,7 +4,6 @@ import type { ProjectSettings } from "./types";
 import { SlideList } from "./components/Timeline";
 import { PropertiesPanel } from "./components/PropertiesPanel";
 import { Preview, type PreviewHandle } from "./components/Preview";
-import { ExportRenderer } from "./components/ExportRenderer";
 import {
   Play,
   Pause,
@@ -338,7 +337,6 @@ function App() {
   const setCurrentTime = useProjectStore((s) => s.setCurrentTime);
 
   const previewRef = useRef<PreviewHandle>(null);
-  const exportRendererRef = useRef<HTMLDivElement>(null);
   const abortRef = useRef<AbortController | null>(null);
 
   const [showExport, setShowExport] = useState(false);
@@ -364,9 +362,6 @@ function App() {
   }, [setCurrentTime]);
 
   const handleExport = useCallback(async () => {
-    const container = exportRendererRef.current;
-    if (!container) return;
-
     previewRef.current?.pause();
 
     const ac = new AbortController();
@@ -374,14 +369,12 @@ function App() {
     setExportState({ status: "rendering", percent: 0, currentFrame: 0 });
     const startTime = Date.now();
 
+    const slidesSnapshot = useProjectStore.getState().slides;
+
     try {
       const blob = await exportVideo({
-        container,
-        width: settings.width,
-        height: settings.height,
-        fps: settings.fps,
-        totalFrames: Math.max(1, totalFrames),
-        setTime: (seconds) => setCurrentTime(seconds),
+        slides: slidesSnapshot,
+        settings,
         onProgress: (percent, cf) =>
           setExportState({ status: "rendering", percent, currentFrame: cf }),
         signal: ac.signal,
@@ -403,7 +396,7 @@ function App() {
     } finally {
       abortRef.current = null;
     }
-  }, [settings, totalFrames, setCurrentTime]);
+  }, [settings]);
 
   const cancelExport = useCallback(() => abortRef.current?.abort(), []);
 
@@ -477,8 +470,6 @@ function App() {
             onRestart={restart}
           />
         </div>
-
-        {showExport && <ExportRenderer ref={exportRendererRef} />}
 
         <ExportDialog
           open={showExport}

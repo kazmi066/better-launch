@@ -1,26 +1,45 @@
-import gsap from "gsap";
-import type { AnimationFactory } from "./types";
+import { clamp, easeOutPower3 } from "../lib/easing";
+import { drawTextBlock } from "../lib/text-draw";
+import type { AnimationFactory, AnimationRenderContext } from "./types";
 
-export const fadeIn: AnimationFactory = ({ headingEl, subheadingEl }) => {
-  const tl = gsap.timeline({ paused: true });
+const HEADING_END = 0.8 / 0.9;
+const SUB_START = 0.3 / 0.9;
+const HEADING_RISE_PX = 30;
+const SUB_RISE_PX = 20;
 
-  if (headingEl) {
-    tl.fromTo(
-      headingEl,
-      { opacity: 0, y: 30 },
-      { opacity: 1, y: 0, duration: 0.8, ease: "power3.out" },
-      0,
-    );
-  }
+export const fadeIn: AnimationFactory = () => ({
+  render(ctx: AnimationRenderContext) {
+    const {
+      ctx: c,
+      heading,
+      subheading,
+      headingX,
+      headingY,
+      subheadingX,
+      subheadingY,
+      textAlign,
+      textColor,
+      progress,
+    } = ctx;
 
-  if (subheadingEl) {
-    tl.fromTo(
-      subheadingEl,
-      { opacity: 0, y: 20 },
-      { opacity: 1, y: 0, duration: 0.6, ease: "power3.out" },
-      0.3,
-    );
-  }
+    const h = easeOutPower3(clamp(progress / HEADING_END));
+    drawTextBlock(c, heading, {
+      x: headingX,
+      y: headingY + (1 - h) * HEADING_RISE_PX,
+      color: textColor,
+      alpha: h,
+      align: textAlign,
+    });
 
-  return tl;
-};
+    if (subheading) {
+      const s = easeOutPower3(clamp((progress - SUB_START) / (1 - SUB_START)));
+      drawTextBlock(c, subheading, {
+        x: subheadingX,
+        y: subheadingY + (1 - s) * SUB_RISE_PX,
+        color: textColor,
+        alpha: s * 0.7,
+        align: textAlign,
+      });
+    }
+  },
+});

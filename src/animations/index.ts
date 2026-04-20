@@ -9,4 +9,8 @@ export const animations: AnimationRegistry = {
   "shutter-up": shutterUp,
 };
 
-export type { AnimationFactory, AnimationContext } from "./types";
+export type {
+  AnimationFactory,
+  AnimationRenderer,
+  AnimationRenderContext,
+} from "./types";

@@ -5,6 +5,7 @@ export interface SlideTimeInfo {
   index: number;
   startTime: number;
   endTime: number;
+  localTime: number;
   localProgress: number;
 }
 
@@ -26,7 +27,9 @@ export function getActiveSlide(
         index: i,
         startTime: start,
         endTime: end,
-        localProgress: elapsed / slide.durationSeconds,
+        localTime: elapsed,
+        localProgress:
+          slide.durationSeconds > 0 ? elapsed / slide.durationSeconds : 0,
       };
     }
 
@@ -40,6 +43,7 @@ export function getActiveSlide(
       index: slides.length - 1,
       startTime: cumulative - lastSlide.durationSeconds,
       endTime: cumulative,
+      localTime: lastSlide.durationSeconds,
       localProgress: 1,
     };
   }
