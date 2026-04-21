@@ -4,6 +4,7 @@ import type {
   StandardSlide,
   VideoSlide,
   ProjectSettings,
+  AudioTrack,
 } from "./types";
 import { DEFAULT_SETTINGS } from "./types";
 
@@ -55,6 +56,7 @@ interface ProjectStore {
   selectedSlideId: string | null;
   isPlaying: boolean;
   currentTime: number;
+  audioTrack: AudioTrack | null;
 
   setSlides: (slides: Slide[]) => void;
   addSlide: (slide: Slide, afterIndex?: number) => void;
@@ -65,6 +67,9 @@ interface ProjectStore {
   setSettings: (settings: Partial<ProjectSettings>) => void;
   setIsPlaying: (playing: boolean) => void;
   setCurrentTime: (time: number) => void;
+
+  setAudioTrack: (track: AudioTrack | null) => void;
+  updateAudioTrack: (patch: Partial<AudioTrack>) => void;
 
   totalDurationSeconds: () => number;
   totalDurationFrames: () => number;
@@ -84,6 +89,7 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
   selectedSlideId: null,
   isPlaying: false,
   currentTime: 0,
+  audioTrack: null,
 
   setSlides: (slides) => set({ slides }),
 
@@ -129,6 +135,24 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
   setIsPlaying: (playing) => set({ isPlaying: playing }),
 
   setCurrentTime: (time) => set({ currentTime: time }),
+
+  setAudioTrack: (track) => {
+    const prev = get().audioTrack;
+    if (prev && prev.url !== track?.url) {
+      // Release the previous ObjectURL so we don't leak memory when the user swaps one file for another.
+      try {
+        URL.revokeObjectURL(prev.url);
+      } catch {}
+    }
+    set({ audioTrack: track });
+  },
+
+  updateAudioTrack: (patch) =>
+    set((state) =>
+      state.audioTrack
+        ? { audioTrack: { ...state.audioTrack, ...patch } }
+        : state,
+    ),
 
   totalDurationSeconds: () =>
     get().slides.reduce((sum, s) => sum + s.durationSeconds, 0),

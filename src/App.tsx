@@ -4,6 +4,7 @@ import type { ProjectSettings } from "./types";
 import { SlideList } from "./components/Timeline";
 import { PropertiesPanel } from "./components/PropertiesPanel";
 import { Preview, type PreviewHandle } from "./components/Preview";
+import { MusicTrack } from "./components/MusicTrack";
 import {
   Play,
   Pause,
@@ -357,6 +358,7 @@ function App() {
   }, [isPlaying]);
 
   const restart = useCallback(() => {
+    previewRef.current?.pause();
     setCurrentTime(0);
     previewRef.current?.play();
   }, [setCurrentTime]);
@@ -369,12 +371,15 @@ function App() {
     setExportState({ status: "rendering", percent: 0, currentFrame: 0 });
     const startTime = Date.now();
 
-    const slidesSnapshot = useProjectStore.getState().slides;
+    const storeSnapshot = useProjectStore.getState();
+    const slidesSnapshot = storeSnapshot.slides;
+    const audioTrackSnapshot = storeSnapshot.audioTrack;
 
     try {
       const blob = await exportVideo({
         slides: slidesSnapshot,
         settings,
+        audioTrack: audioTrackSnapshot,
         onProgress: (percent, cf) =>
           setExportState({ status: "rendering", percent, currentFrame: cf }),
         signal: ac.signal,
@@ -460,6 +465,8 @@ function App() {
             <PropertiesPanel />
           </div>
         </div>
+
+        <MusicTrack />
 
         <div className="border-t border-border bg-card px-4 py-2">
           <TransportControls

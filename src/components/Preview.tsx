@@ -23,10 +23,45 @@ export const Preview = forwardRef<PreviewHandle>((_props, ref) => {
   const setCurrentTime = useProjectStore((s) => s.setCurrentTime);
   const isPlaying = useProjectStore((s) => s.isPlaying);
   const setIsPlaying = useProjectStore((s) => s.setIsPlaying);
+  const audioTrack = useProjectStore((s) => s.audioTrack);
 
   const containerRef = useRef<HTMLDivElement>(null);
+  const audioRef = useRef<HTMLAudioElement>(null);
   const rafRef = useRef<number>(0);
   const lastTickRef = useRef<number>(0);
+
+  // Keep volume in sync whenever the user drags the slider.
+  useEffect(() => {
+    const a = audioRef.current;
+    if (!a || !audioTrack) return;
+    a.volume = audioTrack.volume;
+    a.loop = true;
+  }, [audioTrack?.volume, audioTrack?.url]);
+
+  // Play / pause follows the timeline. We re-sync currentTime on every
+  // play start so the user hears from the correct spot after scrubbing.
+  useEffect(() => {
+    const a = audioRef.current;
+    if (!a || !audioTrack || audioTrack.duration <= 0) return;
+    if (isPlaying) {
+      const t = useProjectStore.getState().currentTime % audioTrack.duration;
+      a.currentTime = t;
+      a.play().catch(() => {});
+    } else {
+      a.pause();
+    }
+  }, [isPlaying, audioTrack?.url, audioTrack?.duration]);
+
+  // Keep audio position locked to timeline seeks/restarts. While
+  // playing we only snap on larger drift to avoid fighting the media
+  // clock every frame.
+  useEffect(() => {
+    const a = audioRef.current;
+    if (!a || !audioTrack || audioTrack.duration <= 0) return;
+    const target = currentTime % audioTrack.duration;
+    const threshold = isPlaying ? 0.2 : 0.05;
+    if (Math.abs(a.currentTime - target) > threshold) a.currentTime = target;
+  }, [currentTime, isPlaying, audioTrack?.url, audioTrack?.duration]);
 
   const totalDuration = slides.reduce((s, sl) => s + sl.durationSeconds, 0);
   const active = getActiveSlide(slides, currentTime);
@@ -73,6 +108,14 @@ export const Preview = forwardRef<PreviewHandle>((_props, ref) => {
 
   return (
     <div className="flex-1 flex flex-col min-w-0">
+      {audioTrack && (
+        <audio
+          ref={audioRef}
+          src={audioTrack.url}
+          preload="auto"
+          className="hidden"
+        />
+      )}
       <div className="flex-1 flex items-center justify-center p-8 bg-background">
         <div className="w-full max-w-4xl">
           <div

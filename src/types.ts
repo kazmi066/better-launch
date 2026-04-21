@@ -92,3 +92,16 @@ export const DEFAULT_SETTINGS: ProjectSettings = {
   width: 1920,
   height: 1080,
 };
+
+// ── Audio track ──────────────────────────────────────────────────────
+
+export interface AudioTrack {
+  url: string;
+  name: string;
+  duration: number;
+  sampleRate: number;
+  numberOfChannels: number;
+  volume: number;
+  // Pre-computed waveform peaks in 0..1, bin count is fixed when decoded
+  waveform: number[];
+}

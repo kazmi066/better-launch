@@ -1,5 +1,5 @@
 import { Muxer, ArrayBufferTarget } from "mp4-muxer";
-import type { ProjectSettings, Slide } from "../types";
+import type { AudioTrack, ProjectSettings, Slide } from "../types";
 import { getActiveSlide } from "../engine/renderer";
 import { renderScene } from "./scene";
 import {
@@ -8,10 +8,12 @@ import {
   seekVideo,
   waitForVideoReady,
 } from "./media-cache";
+import { encodeAudioToMuxer, prepareAudioForExport } from "./audio";
 
 export interface ExportOptions {
   slides: Slide[];
   settings: ProjectSettings;
+  audioTrack?: AudioTrack | null;
   onProgress: (percent: number, currentFrame: number) => void;
   signal?: AbortSignal;
 }
@@ -101,7 +103,7 @@ async function syncVideoFrames(
 }
 
 export async function exportVideo(options: ExportOptions): Promise<Blob> {
-  const { slides, settings, onProgress, signal } = options;
+  const { slides, settings, audioTrack, onProgress, signal } = options;
   const { width, height, fps } = settings;
 
   if (!isWebCodecsSupported()) {
@@ -119,25 +121,40 @@ export async function exportVideo(options: ExportOptions): Promise<Blob> {
   const ctx = canvas.getContext("2d", { alpha: false });
   if (!ctx) throw new Error("Failed to acquire 2D context for export");
 
+  // Decode + shape the audio track BEFORE configuring the muxer so the
+  // audio track's sampleRate / channel count are known upfront. Muxer
+  // audio config must match what the AudioEncoder emits.
+  const preparedAudio =
+    audioTrack && totalSeconds > 0
+      ? await prepareAudioForExport(audioTrack, totalSeconds)
+      : null;
+
   await preloadMedia(slides);
 
   const muxer = new Muxer({
     target: new ArrayBufferTarget(),
     video: { codec: "avc", width, height },
+    audio: preparedAudio
+      ? {
+          codec: "aac",
+          numberOfChannels: preparedAudio.numberOfChannels,
+          sampleRate: preparedAudio.sampleRate,
+        }
+      : undefined,
     fastStart: "in-memory",
     firstTimestampBehavior: "offset",
   });
 
-  let encoderError: Error | null = null;
+  let videoError: Error | null = null;
 
-  const encoder = new VideoEncoder({
+  const videoEncoder = new VideoEncoder({
     output: (chunk, meta) => muxer.addVideoChunk(chunk, meta ?? undefined),
     error: (e) => {
-      encoderError = e;
+      videoError = e;
     },
   });
 
-  encoder.configure({
+  videoEncoder.configure({
     codec: getCodecString(width, height),
     width,
     height,
@@ -151,7 +168,7 @@ export async function exportVideo(options: ExportOptions): Promise<Blob> {
     for (let frame = 0; frame < totalFrames; frame++) {
       if (signal?.aborted)
         throw new DOMException("Export cancelled", "AbortError");
-      if (encoderError) throw encoderError;
+      if (videoError) throw videoError;
 
       const t = frame / fps;
       const active = getActiveSlide(slides, t);
@@ -169,24 +186,31 @@ export async function exportVideo(options: ExportOptions): Promise<Blob> {
         duration: Math.round(1_000_000 / fps),
       });
 
-      encoder.encode(videoFrame, { keyFrame: frame % (fps * 2) === 0 });
+      videoEncoder.encode(videoFrame, { keyFrame: frame % (fps * 2) === 0 });
       videoFrame.close();
 
-      if (encoder.encodeQueueSize > 2) {
-        await waitForEncoderDrain(encoder);
+      if (videoEncoder.encodeQueueSize > 2) {
+        await waitForEncoderDrain(videoEncoder);
       }
 
       onProgress(Math.round(((frame + 1) / totalFrames) * 100), frame + 1);
     }
 
-    await encoder.flush();
-    encoder.close();
+    await videoEncoder.flush();
+    videoEncoder.close();
+
+    if (preparedAudio) {
+      await encodeAudioToMuxer(preparedAudio, (chunk, meta) =>
+        muxer.addAudioChunk(chunk, meta ?? undefined),
+      );
+    }
+
     muxer.finalize();
 
     return new Blob([muxer.target.buffer], { type: "video/mp4" });
   } catch (e) {
     try {
-      encoder.close();
+      videoEncoder.close();
     } catch {
       /* noop */
     }
