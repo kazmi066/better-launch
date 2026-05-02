@@ -94,7 +94,11 @@ async function syncVideoFrames(
   } else if (active.slide.type === "video" && active.slide.videoUrl) {
     const v = getOrCreateVideo(active.slide.videoUrl);
     if (v.readyState >= 2 && Number.isFinite(v.duration) && v.duration > 0) {
-      const t = Math.min(active.localTime, v.duration);
+      // Map slide-local time onto the trimmed window. trimEnd of 0
+      // means "no trim configured" — fall back to the source duration.
+      const slide = active.slide;
+      const trimEnd = slide.trimEnd > 0 ? slide.trimEnd : v.duration;
+      const t = Math.min(slide.trimStart + active.localTime, trimEnd);
       seeks.push(seekVideo(v, t).catch(() => {}));
     }
   }

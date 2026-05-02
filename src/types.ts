@@ -1,5 +1,11 @@
-// ── Text animation types (GSAP-driven) ──────────────────────────────
-export type TextAnimationType = "fade-in" | "split-reveal" | "shutter-up";
+// ── Text animation types ────────────────────────────────────────────
+export type TextAnimationType =
+  | "fade-in"
+  | "split-reveal"
+  | "shutter-up"
+  | "blur-in"
+  | "char-stagger"
+  | "scale-pop";
 
 export const TEXT_ANIMATION_OPTIONS: {
   value: TextAnimationType;
@@ -20,6 +26,21 @@ export const TEXT_ANIMATION_OPTIONS: {
     value: "shutter-up",
     label: "Shutter Up",
     description: "Text slides up from behind a clip mask",
+  },
+  {
+    value: "blur-in",
+    label: "Blur In",
+    description: "Heading emerges from a heavy blur with a subtle scale settle",
+  },
+  {
+    value: "char-stagger",
+    label: "Char Stagger",
+    description: "Character-by-character reveal with a soft drift",
+  },
+  {
+    value: "scale-pop",
+    label: "Scale Pop",
+    description: "Heading drops in with an overshoot bounce",
   },
 ];
 
@@ -75,7 +96,12 @@ export interface VideoSlide {
   label: string;
   videoUrl: string;
   videoFileName: string;
+  // The trimmed slide length, used by the global timeline.
+  // Always equals `trimEnd - trimStart`.
   durationSeconds: number;
+  sourceDurationSeconds: number;
+  trimStart: number;
+  trimEnd: number;
 }
 
 export type Slide = StandardSlide | VideoSlide;

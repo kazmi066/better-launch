@@ -44,6 +44,9 @@ export function createVideoSlide(overrides?: Partial<VideoSlide>): VideoSlide {
     videoUrl: "",
     videoFileName: "",
     durationSeconds: 0,
+    sourceDurationSeconds: 0,
+    trimStart: 0,
+    trimEnd: 0,
     ...overrides,
   };
 }

@@ -1,5 +1,5 @@
 import React, { useEffect, useRef } from "react";
-import type { Slide, ProjectSettings } from "../../types";
+import type { Slide, ProjectSettings, VideoSlide } from "../../types";
 import { renderScene } from "../../lib/scene";
 import {
   ensureImageLoaded,
@@ -14,9 +14,14 @@ interface Props {
   isPlaying: boolean;
 }
 
-// Canvas backing-store is the project's native resolution
-// (e.g. 1920×1080). We only CSS-scale to fit the UI, so preview and
-// export go through the exact same renderScene pixels.
+function clampToTrim(absVideoTime: number, slide: VideoSlide): number {
+  const lo = Math.max(0, slide.trimStart);
+  const hi = slide.trimEnd > 0 ? slide.trimEnd : absVideoTime;
+  if (absVideoTime < lo) return lo;
+  if (absVideoTime > hi) return hi;
+  return absVideoTime;
+}
+
 export const SlideCanvas: React.FC<Props> = ({
   slide,
   localTime,
@@ -80,11 +85,17 @@ export const SlideCanvas: React.FC<Props> = ({
     if (slide.type === "video" && slide.videoUrl) {
       const v = getOrCreateVideo(slide.videoUrl);
       if (isPlaying) {
+        // Re-anchor to the trim window before playing so a fresh play
+        // never picks up wherever the video element happened to be left.
+        if (v.duration && Number.isFinite(v.duration)) {
+          const target = clampToTrim(slide.trimStart + localTime, slide);
+          if (Math.abs(v.currentTime - target) > 0.05) v.currentTime = target;
+        }
         v.play().catch(() => {});
       } else {
         v.pause();
         if (v.duration && Number.isFinite(v.duration)) {
-          v.currentTime = Math.max(0, Math.min(localTime, v.duration));
+          v.currentTime = clampToTrim(slide.trimStart + localTime, slide);
         }
       }
     }
@@ -94,6 +105,8 @@ export const SlideCanvas: React.FC<Props> = ({
     slide?.type === "standard" ? slide.backgroundType : null,
     slide?.type === "standard" ? slide.backgroundVideoUrl : null,
     slide?.type === "video" ? slide.videoUrl : null,
+    slide?.type === "video" ? slide.trimStart : null,
+    slide?.type === "video" ? slide.trimEnd : null,
   ]);
 
   useEffect(() => {
@@ -101,12 +114,14 @@ export const SlideCanvas: React.FC<Props> = ({
     if (isPlaying) return;
     const v = getOrCreateVideo(slide.videoUrl);
     if (!v.duration || !Number.isFinite(v.duration)) return;
-    v.currentTime = Math.max(0, Math.min(localTime, v.duration));
+    v.currentTime = clampToTrim(slide.trimStart + localTime, slide);
   }, [
     localTime,
     isPlaying,
     slide?.type,
     slide?.type === "video" ? slide.videoUrl : null,
+    slide?.type === "video" ? slide.trimStart : null,
+    slide?.type === "video" ? slide.trimEnd : null,
   ]);
 
   useEffect(() => {
@@ -142,6 +157,30 @@ export const SlideCanvas: React.FC<Props> = ({
       };
       tickRef.current = requestAnimationFrame(loop);
       return () => cancelAnimationFrame(tickRef.current);
+    }
+
+    let videoEl: HTMLVideoElement | null = null;
+    if (slide?.type === "video" && slide.videoUrl) {
+      videoEl = getOrCreateVideo(slide.videoUrl);
+    } else if (
+      slide?.type === "standard" &&
+      slide.backgroundType === "video" &&
+      slide.backgroundVideoUrl
+    ) {
+      videoEl = getOrCreateVideo(slide.backgroundVideoUrl);
+    }
+
+    if (videoEl) {
+      const v = videoEl;
+      const repaint = () => paint();
+      v.addEventListener("seeked", repaint);
+      v.addEventListener("loadeddata", repaint);
+      v.addEventListener("canplay", repaint);
+      return () => {
+        v.removeEventListener("seeked", repaint);
+        v.removeEventListener("loadeddata", repaint);
+        v.removeEventListener("canplay", repaint);
+      };
     }
   }, [slide, localTime, settings.width, settings.height, isPlaying]);
 
