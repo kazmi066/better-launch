@@ -3,6 +3,7 @@ import type {
   Slide,
   StandardSlide,
   VideoSlide,
+  LogoSlide,
   ProjectSettings,
   AudioTrack,
 } from "./types";
@@ -51,6 +52,24 @@ export function createVideoSlide(overrides?: Partial<VideoSlide>): VideoSlide {
   };
 }
 
+export function createLogoSlide(overrides?: Partial<LogoSlide>): LogoSlide {
+  return {
+    type: "logo",
+    id: newId(),
+    label: "Brand Logo",
+    logoImageUrl: "",
+    logoFileName: "",
+    caption: "",
+    captionFontSize: 28,
+    logoSize: 0.32,
+    backgroundColor: "#09090b",
+    textColor: "#ffffff",
+    animation: "scale-pop",
+    durationSeconds: 3,
+    ...overrides,
+  };
+}
+
 // ── Store ────────────────────────────────────────────────────────────
 
 interface ProjectStore {
@@ -79,6 +98,7 @@ interface ProjectStore {
 
   addStandardSlide: (afterIndex?: number) => void;
   addVideoSlide: (afterIndex?: number) => void;
+  addLogoSlide: (afterIndex?: number) => void;
 }
 
 export const useProjectStore = create<ProjectStore>((set, get) => ({
@@ -171,5 +191,9 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
 
   addVideoSlide: (afterIndex) => {
     get().addSlide(createVideoSlide(), afterIndex);
+  },
+
+  addLogoSlide: (afterIndex) => {
+    get().addSlide(createLogoSlide(), afterIndex);
   },
 }));

@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import type { Slide, ProjectSettings, VideoSlide } from "../../types";
 import { renderScene } from "../../lib/scene";
 import {
@@ -30,29 +30,31 @@ export const SlideCanvas: React.FC<Props> = ({
 }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const tickRef = useRef(0);
-  const [, forceRender] = React.useReducer((x: number) => x + 1, 0);
+  // Bumps when a slide's async resource finishes loading. Listed as a
+  // dep on the paint effect so the canvas repaints once the asset is
+  // available — the previous `useReducer` counter wasn't a dep so
+  // freshly-loaded images silently failed to repaint.
+  const [assetReadyTick, setAssetReadyTick] = useState(0);
 
   useEffect(() => {
     if (!slide) return;
+    let cancelled = false;
+    const triggerIfAlive = () => {
+      if (!cancelled) setAssetReadyTick((x) => x + 1);
+    };
 
     if (slide.type === "standard") {
       if (slide.backgroundType === "image" && slide.backgroundImageUrl) {
-        let cancelled = false;
         ensureImageLoaded(slide.backgroundImageUrl)
-          .then(() => {
-            if (!cancelled) forceRender();
-          })
+          .then(triggerIfAlive)
           .catch(() => {});
-        return () => {
-          cancelled = true;
-        };
       }
       if (slide.backgroundType === "video" && slide.backgroundVideoUrl) {
         const v = getOrCreateVideo(slide.backgroundVideoUrl);
         v.loop = true;
         v.muted = true;
         waitForVideoReady(v)
-          .then(() => forceRender())
+          .then(triggerIfAlive)
           .catch(() => {});
       }
     }
@@ -60,15 +62,26 @@ export const SlideCanvas: React.FC<Props> = ({
     if (slide.type === "video" && slide.videoUrl) {
       const v = getOrCreateVideo(slide.videoUrl);
       waitForVideoReady(v)
-        .then(() => forceRender())
+        .then(triggerIfAlive)
         .catch(() => {});
     }
+
+    if (slide.type === "logo" && slide.logoImageUrl) {
+      ensureImageLoaded(slide.logoImageUrl)
+        .then(triggerIfAlive)
+        .catch(() => {});
+    }
+
+    return () => {
+      cancelled = true;
+    };
   }, [
     slide?.type,
     slide?.type === "standard" ? slide.backgroundType : null,
     slide?.type === "standard" ? slide.backgroundImageUrl : null,
     slide?.type === "standard" ? slide.backgroundVideoUrl : null,
     slide?.type === "video" ? slide.videoUrl : null,
+    slide?.type === "logo" ? slide.logoImageUrl : null,
   ]);
 
   useEffect(() => {
@@ -182,7 +195,14 @@ export const SlideCanvas: React.FC<Props> = ({
         v.removeEventListener("canplay", repaint);
       };
     }
-  }, [slide, localTime, settings.width, settings.height, isPlaying]);
+  }, [
+    slide,
+    localTime,
+    settings.width,
+    settings.height,
+    isPlaying,
+    assetReadyTick,
+  ]);
 
   return (
     <canvas

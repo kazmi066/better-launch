@@ -3,6 +3,7 @@ import { useProjectStore } from "../store";
 import { Separator } from "./ui/separator";
 import { StandardSlideProps } from "./properties/StandardSlideProps";
 import { VideoSlideProps } from "./properties/VideoSlideProps";
+import { LogoSlideProps } from "./properties/LogoSlideProps";
 
 export const PropertiesPanel: React.FC = () => {
   const slides = useProjectStore((s) => s.slides);
@@ -20,6 +21,7 @@ export const PropertiesPanel: React.FC = () => {
   const typeLabel: Record<string, string> = {
     standard: "Standard Slide",
     video: "Video Slide",
+    logo: "Logo Slide",
   };
 
   return (
@@ -34,6 +36,7 @@ export const PropertiesPanel: React.FC = () => {
       <div className="flex-1 overflow-y-auto p-4">
         {slide.type === "standard" && <StandardSlideProps slide={slide} />}
         {slide.type === "video" && <VideoSlideProps slide={slide} />}
+        {slide.type === "logo" && <LogoSlideProps slide={slide} />}
       </div>
     </div>
   );

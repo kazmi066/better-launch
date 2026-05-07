@@ -104,7 +104,63 @@ export interface VideoSlide {
   trimEnd: number;
 }
 
-export type Slide = StandardSlide | VideoSlide;
+// ── Logo slide ──────────────────────────────────────────────────────
+export type LogoAnimationType =
+  | "fade-in"
+  | "scale-pop"
+  | "iris-reveal"
+  | "shine-sweep"
+  | "drop-bounce";
+
+export const LOGO_ANIMATION_OPTIONS: {
+  value: LogoAnimationType;
+  label: string;
+  description: string;
+}[] = [
+  {
+    value: "fade-in",
+    label: "Fade In",
+    description: "Gentle opacity fade with a subtle scale settle",
+  },
+  {
+    value: "scale-pop",
+    label: "Scale Pop",
+    description: "Drops in with an overshoot bounce",
+  },
+  {
+    value: "iris-reveal",
+    label: "Iris Reveal",
+    description: "Circular mask expands from center",
+  },
+  {
+    value: "shine-sweep",
+    label: "Shine Sweep",
+    description: "Logo fades in then a glossy highlight sweeps across",
+  },
+  {
+    value: "drop-bounce",
+    label: "Drop Bounce",
+    description: "Falls from above and settles with a bounce",
+  },
+];
+
+export interface LogoSlide {
+  type: "logo";
+  id: string;
+  label: string;
+  logoImageUrl: string;
+  logoFileName: string;
+  caption: string;
+  captionFontSize: number;
+  // Logo height as a fraction of the canvas height (e.g. 0.32 = 32%).
+  logoSize: number;
+  backgroundColor: string;
+  textColor: string;
+  animation: LogoAnimationType;
+  durationSeconds: number;
+}
+
+export type Slide = StandardSlide | VideoSlide | LogoSlide;
 
 // ── Project settings ─────────────────────────────────────────────────
 export interface ProjectSettings {

@@ -1,5 +1,13 @@
 import React, { useState } from "react";
-import { Film, Type, Trash2, ChevronUp, ChevronDown, Plus } from "lucide-react";
+import {
+  Film,
+  Type,
+  Trash2,
+  ChevronUp,
+  ChevronDown,
+  Plus,
+  Sparkles,
+} from "lucide-react";
 import { useProjectStore } from "../store";
 import type { Slide } from "../types";
 import { cn } from "../lib/utils";
@@ -12,6 +20,8 @@ const slideIcon = (type: Slide["type"]) => {
       return <Type className="w-3.5 h-3.5" />;
     case "video":
       return <Film className="w-3.5 h-3.5" />;
+    case "logo":
+      return <Sparkles className="w-3.5 h-3.5" />;
   }
 };
 
@@ -21,6 +31,8 @@ const slideLabel = (slide: Slide) => {
       return slide.heading || "Standard Slide";
     case "video":
       return slide.label || "Video Clip";
+    case "logo":
+      return slide.label || "Brand Logo";
   }
 };
 
@@ -30,6 +42,8 @@ const slideBorderColor = (type: Slide["type"]) => {
       return "border-l-white";
     case "video":
       return "border-l-[#0070f3]";
+    case "logo":
+      return "border-l-[#f5a623]";
   }
 };
 
@@ -41,6 +55,7 @@ export const SlideList: React.FC = () => {
   const moveSlide = useProjectStore((s) => s.moveSlide);
   const addStandardSlide = useProjectStore((s) => s.addStandardSlide);
   const addVideoSlide = useProjectStore((s) => s.addVideoSlide);
+  const addLogoSlide = useProjectStore((s) => s.addLogoSlide);
 
   const [showAddMenu, setShowAddMenu] = useState(false);
 
@@ -50,32 +65,38 @@ export const SlideList: React.FC = () => {
 
   return (
     <div className="flex flex-col h-full">
-      <div className="flex items-center justify-between px-4 py-3">
-        <div>
-          <h2 className="text-[13px] font-semibold text-foreground">Slides</h2>
-          <p className="text-[11px] text-muted-foreground">
-            {slides.length} slide{slides.length !== 1 ? "s" : ""} ·{" "}
-            {totalSeconds}s
-          </p>
-        </div>
-        <div className="flex gap-1">
-          <Button
-            variant="secondary"
-            size="sm"
-            onClick={() => addStandardSlide()}
-            className="h-7 text-[11px] gap-1">
-            <Type className="w-3 h-3" />
-            Standard
-          </Button>
-          <Button
-            variant="secondary"
-            size="sm"
-            onClick={() => addVideoSlide()}
-            className="h-7 text-[11px] gap-1">
-            <Film className="w-3 h-3" />
-            Video
-          </Button>
-        </div>
+      <div className="px-4 py-3">
+        <h2 className="text-[13px] font-semibold text-foreground">Slides</h2>
+        <p className="text-[11px] text-muted-foreground">
+          {slides.length} slide{slides.length !== 1 ? "s" : ""} · {totalSeconds}
+          s
+        </p>
+      </div>
+      <div className="px-4 pb-3 flex gap-1">
+        <Button
+          variant="secondary"
+          size="sm"
+          onClick={() => addStandardSlide()}
+          className="h-7 text-[11px] gap-1">
+          <Type className="w-3 h-3" />
+          Text
+        </Button>
+        <Button
+          variant="secondary"
+          size="sm"
+          onClick={() => addVideoSlide()}
+          className="h-7 text-[11px] gap-1">
+          <Film className="w-3 h-3" />
+          Video
+        </Button>
+        <Button
+          variant="secondary"
+          size="sm"
+          onClick={() => addLogoSlide()}
+          className="h-7 text-[11px] gap-1">
+          <Sparkles className="w-3 h-3" />
+          Logo
+        </Button>
       </div>
 
       <Separator />
@@ -187,6 +208,22 @@ export const SlideList: React.FC = () => {
                 </p>
                 <p className="text-[10px] text-muted-foreground">
                   Import a local video file
+                </p>
+              </div>
+            </button>
+            <button
+              onClick={() => {
+                addLogoSlide();
+                setShowAddMenu(false);
+              }}
+              className="w-full flex items-center gap-2.5 px-3 py-2.5 hover:bg-secondary transition-colors text-left">
+              <Sparkles className="w-4 h-4 text-muted-foreground" />
+              <div>
+                <p className="text-[13px] font-medium text-foreground">
+                  Logo Slide
+                </p>
+                <p className="text-[10px] text-muted-foreground">
+                  Centered brand logo with optional caption
                 </p>
               </div>
             </button>

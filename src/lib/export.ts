@@ -66,6 +66,9 @@ async function preloadMedia(slides: Slide[]): Promise<void> {
       v.pause();
       videoPromises.push(waitForVideoReady(v).catch(() => {}));
     }
+    if (slide.type === "logo" && slide.logoImageUrl) {
+      imagePromises.push(ensureImageLoaded(slide.logoImageUrl).catch(() => {}));
+    }
   }
 
   await Promise.all([...imagePromises, ...videoPromises]);

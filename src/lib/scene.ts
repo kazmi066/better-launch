@@ -1,13 +1,15 @@
 // renderScene is the single entrypoint used by both the live preview
 // and the WebCodecs export — same inputs produce identical pixels.
 
-import type { Slide, StandardSlide, TextPosition } from "../types";
+import type { Slide, StandardSlide, LogoSlide, TextPosition } from "../types";
 import {
   DEFAULT_FONT_FAMILY,
+  applyFontStyle,
   layoutText,
   type TextLayout,
 } from "./text-layout";
 import { animations } from "../animations";
+import { logoAnimations } from "../animations/logo";
 import type { AnimationRenderContext } from "../animations/types";
 import { getImageSync, getOrCreateVideo } from "./media-cache";
 import { clamp } from "./easing";
@@ -241,6 +243,122 @@ function renderVideoSlide(
   }
 }
 
+const LOGO_CAPTION_GAP_FRACTION = 0.55;
+const LOGO_DEFAULT_ASPECT = 1;
+
+function computeLogoLayout(
+  slide: LogoSlide,
+  size: SceneSize,
+  imageAspect: number,
+  captionHeight: number,
+): {
+  logoX: number;
+  logoY: number;
+  logoW: number;
+  logoH: number;
+  captionY: number;
+} {
+  const logoH = size.height * clamp(slide.logoSize, 0.05, 0.85);
+  const logoW = logoH * imageAspect;
+  const gap = slide.caption
+    ? slide.captionFontSize * LOGO_CAPTION_GAP_FRACTION
+    : 0;
+  const totalH = logoH + (slide.caption ? gap + captionHeight : 0);
+
+  const blockTop = (size.height - totalH) / 2;
+  const logoX = (size.width - logoW) / 2;
+  const logoY = blockTop;
+  const captionY = blockTop + logoH + gap;
+
+  return { logoX, logoY, logoW, logoH, captionY };
+}
+
+function renderLogoSlide(
+  ctx: CanvasRenderingContext2D,
+  slide: LogoSlide,
+  localTime: number,
+  size: SceneSize,
+) {
+  drawColorBackground(ctx, slide.backgroundColor || "#000000", size);
+
+  const img = slide.logoImageUrl ? getImageSync(slide.logoImageUrl) : null;
+  const aspect =
+    img && img.naturalWidth > 0 && img.naturalHeight > 0
+      ? img.naturalWidth / img.naturalHeight
+      : LOGO_DEFAULT_ASPECT;
+
+  const captionLayout = slide.caption
+    ? layoutText(ctx, slide.caption, {
+        fontSize: slide.captionFontSize,
+        fontWeight: 500,
+        lineHeight: 1.3,
+        letterSpacingEm: 0,
+        maxWidth: size.width * 0.8,
+        fontFamily: DEFAULT_FONT_FAMILY,
+      })
+    : null;
+
+  const { logoX, logoY, logoW, logoH, captionY } = computeLogoLayout(
+    slide,
+    size,
+    aspect,
+    captionLayout ? captionLayout.totalHeight : 0,
+  );
+
+  const progress =
+    slide.durationSeconds > 0
+      ? clamp(localTime / slide.durationSeconds, 0, 1)
+      : 1;
+
+  const factory = logoAnimations[slide.animation];
+  if (factory) {
+    const renderer = factory();
+    renderer.render({
+      ctx,
+      image: img,
+      imageWidth: img?.naturalWidth ?? 0,
+      imageHeight: img?.naturalHeight ?? 0,
+      logoX,
+      logoY,
+      logoW,
+      logoH,
+      progress,
+      size,
+    });
+  }
+
+  if (captionLayout) {
+    const captionAlpha = clamp((progress - 0.25) / 0.5);
+    if (captionAlpha > 0) {
+      ctx.save();
+      ctx.globalAlpha = captionAlpha;
+      const captionX = (size.width - captionLayout.totalWidth) / 2;
+      drawCaption(ctx, captionLayout, captionX, captionY, slide.textColor);
+      ctx.restore();
+    }
+  }
+}
+
+function drawCaption(
+  ctx: CanvasRenderingContext2D,
+  layout: TextLayout,
+  blockX: number,
+  blockY: number,
+  color: string,
+) {
+  ctx.save();
+  applyFontStyle(ctx, layout);
+  ctx.fillStyle = color;
+  for (const line of layout.lines) {
+    const lineX = blockX + (layout.totalWidth - line.width) / 2;
+    const lineY = blockY + line.offsetY;
+    for (const word of line.words) {
+      ctx.fillText(word.text, lineX + word.offsetX, lineY);
+    }
+  }
+  ctx.restore();
+}
+
 export function renderScene(
   ctx: CanvasRenderingContext2D,
   slide: Slide | null,
@@ -254,5 +372,7 @@ export function renderScene(
     renderStandardSlide(ctx, slide, localTime, size);
   } else if (slide.type === "video") {
     renderVideoSlide(ctx, slide, localTime, size);
+  } else if (slide.type === "logo") {
+    renderLogoSlide(ctx, slide, localTime, size);
   }
 }
