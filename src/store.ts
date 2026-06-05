@@ -33,6 +33,7 @@ export function createStandardSlide(
     backgroundVideoUrl: "",
     backgroundVideoFileName: "",
     durationSeconds: 4,
+    delaySeconds: 0,
     ...overrides,
   };
 }
@@ -66,6 +67,7 @@ export function createLogoSlide(overrides?: Partial<LogoSlide>): LogoSlide {
     textColor: "#ffffff",
     animation: "scale-pop",
     durationSeconds: 3,
+    delaySeconds: 0,
     ...overrides,
   };
 }
@@ -178,7 +180,12 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
     ),
 
   totalDurationSeconds: () =>
-    get().slides.reduce((sum, s) => sum + s.durationSeconds, 0),
+    get().slides.reduce((sum, s) => {
+      if (s.type === "standard" || s.type === "logo") {
+        return sum + s.durationSeconds + s.delaySeconds;
+      }
+      return sum + s.durationSeconds;
+    }, 0),
 
   totalDurationFrames: () => {
     const { fps } = get().settings;

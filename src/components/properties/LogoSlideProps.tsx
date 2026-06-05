@@ -201,6 +201,24 @@ export const LogoSlideProps: React.FC<{ slide: LogoSlide }> = ({ slide }) => {
         </div>
       </Field>
 
+      <Field label="Hold Delay">
+        <div className="flex items-center gap-3">
+          <Slider
+            min={0}
+            max={10}
+            step={0.5}
+            value={[slide.delaySeconds]}
+            onValueChange={([v]) => {
+              if (v !== undefined) u({ delaySeconds: v });
+            }}
+            className="flex-1"
+          />
+          <span className="text-xs text-muted-foreground tabular-nums w-12 text-right">
+            {slide.delaySeconds.toFixed(1)}s
+          </span>
+        </div>
+      </Field>
+
       <Separator />
 
       <ColorField

@@ -88,6 +88,7 @@ export interface StandardSlide {
   backgroundVideoUrl: string;
   backgroundVideoFileName: string;
   durationSeconds: number;
+  delaySeconds: number;
 }
 
 export interface VideoSlide {
@@ -158,6 +159,7 @@ export interface LogoSlide {
   textColor: string;
   animation: LogoAnimationType;
   durationSeconds: number;
+  delaySeconds: number;
 }
 
 export type Slide = StandardSlide | VideoSlide | LogoSlide;

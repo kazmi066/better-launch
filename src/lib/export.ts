@@ -119,7 +119,12 @@ export async function exportVideo(options: ExportOptions): Promise<Blob> {
     );
   }
 
-  const totalSeconds = slides.reduce((s, sl) => s + sl.durationSeconds, 0);
+  const totalSeconds = slides.reduce((sum, s) => {
+    if (s.type === "standard" || s.type === "logo") {
+      return sum + s.durationSeconds + s.delaySeconds;
+    }
+    return sum + s.durationSeconds;
+  }, 0);
   const totalFrames = Math.max(1, Math.round(totalSeconds * fps));
 
   const canvas = document.createElement("canvas");

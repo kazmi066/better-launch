@@ -63,7 +63,12 @@ export const Preview = forwardRef<PreviewHandle>((_props, ref) => {
     if (Math.abs(a.currentTime - target) > threshold) a.currentTime = target;
   }, [currentTime, isPlaying, audioTrack?.url, audioTrack?.duration]);
 
-  const totalDuration = slides.reduce((s, sl) => s + sl.durationSeconds, 0);
+  const totalDuration = slides.reduce((sum, s) => {
+    if (s.type === "standard" || s.type === "logo") {
+      return sum + s.durationSeconds + s.delaySeconds;
+    }
+    return sum + s.durationSeconds;
+  }, 0);
   const active = getActiveSlide(slides, currentTime);
 
   const tick = useCallback(() => {
@@ -72,7 +77,12 @@ export const Preview = forwardRef<PreviewHandle>((_props, ref) => {
     lastTickRef.current = now;
 
     const store = useProjectStore.getState();
-    const total = store.slides.reduce((s, sl) => s + sl.durationSeconds, 0);
+    const total = store.slides.reduce((sum, s) => {
+      if (s.type === "standard" || s.type === "logo") {
+        return sum + s.durationSeconds + s.delaySeconds;
+      }
+      return sum + s.durationSeconds;
+    }, 0);
     const next = store.currentTime + delta;
 
     if (next >= total) {

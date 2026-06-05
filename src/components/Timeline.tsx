@@ -60,7 +60,12 @@ export const SlideList: React.FC = () => {
   const [showAddMenu, setShowAddMenu] = useState(false);
 
   const totalSeconds = slides
-    .reduce((s, sl) => s + sl.durationSeconds, 0)
+    .reduce((s, sl) => {
+      if (sl.type === "standard" || sl.type === "logo") {
+        return s + sl.durationSeconds + sl.delaySeconds;
+      }
+      return s + sl.durationSeconds;
+    }, 0)
     .toFixed(1);
 
   return (
@@ -126,7 +131,11 @@ export const SlideList: React.FC = () => {
                   {slideLabel(slide)}
                 </p>
                 <p className="text-[11px] text-muted-foreground capitalize">
-                  {slide.type} · {slide.durationSeconds.toFixed(1)}s
+                  {slide.type} ·{" "}
+                  {slide.type === "standard" || slide.type === "logo"
+                    ? (slide.durationSeconds + slide.delaySeconds).toFixed(1)
+                    : slide.durationSeconds.toFixed(1)}
+                  s
                 </p>
               </div>
 

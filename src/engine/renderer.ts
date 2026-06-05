@@ -17,8 +17,13 @@ export function getActiveSlide(
 
   for (let i = 0; i < slides.length; i++) {
     const slide = slides[i]!;
+    const effectiveDuration =
+      slide.type === "standard" || slide.type === "logo"
+        ? slide.durationSeconds + slide.delaySeconds
+        : slide.durationSeconds;
+
     const start = cumulative;
-    const end = cumulative + slide.durationSeconds;
+    const end = cumulative + effectiveDuration;
 
     if (currentTime >= start && currentTime < end) {
       const elapsed = currentTime - start;
@@ -27,7 +32,10 @@ export function getActiveSlide(
         index: i,
         startTime: start,
         endTime: end,
-        localTime: elapsed,
+        localTime:
+          slide.type === "standard" || slide.type === "logo"
+            ? Math.min(elapsed, slide.durationSeconds)
+            : elapsed,
         localProgress:
           slide.durationSeconds > 0 ? elapsed / slide.durationSeconds : 0,
       };
@@ -38,10 +46,14 @@ export function getActiveSlide(
 
   if (slides.length > 0) {
     const lastSlide = slides[slides.length - 1]!;
+    const lastEffective =
+      lastSlide.type === "standard" || lastSlide.type === "logo"
+        ? lastSlide.durationSeconds + lastSlide.delaySeconds
+        : lastSlide.durationSeconds;
     return {
       slide: lastSlide,
       index: slides.length - 1,
-      startTime: cumulative - lastSlide.durationSeconds,
+      startTime: cumulative - lastEffective,
       endTime: cumulative,
       localTime: lastSlide.durationSeconds,
       localProgress: 1,
@@ -52,5 +64,10 @@ export function getActiveSlide(
 }
 
 export function getTotalDuration(slides: Slide[]): number {
-  return slides.reduce((sum, s) => sum + s.durationSeconds, 0);
+  return slides.reduce((sum, s) => {
+    if (s.type === "standard" || s.type === "logo") {
+      return sum + s.durationSeconds + s.delaySeconds;
+    }
+    return sum + s.durationSeconds;
+  }, 0);
 }
