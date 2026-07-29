@@ -117,7 +117,7 @@ export const Preview = forwardRef<PreviewHandle>((_props, ref) => {
   }));
 
   return (
-    <div className="flex-1 flex flex-col min-w-0">
+    <div className="flex h-full min-h-0 flex-1 flex-col min-w-0">
       {audioTrack && (
         <audio
           ref={audioRef}
@@ -126,10 +126,27 @@ export const Preview = forwardRef<PreviewHandle>((_props, ref) => {
           className="hidden"
         />
       )}
-      <div className="flex-1 flex items-center justify-center p-8 bg-background">
+      <div className="flex h-13 shrink-0 items-center justify-between border-b border-border/70 px-5">
+        <div className="flex items-center gap-2">
+          <span className="text-sm font-medium text-foreground/85">
+            Preview
+          </span>
+          <span className="h-1 w-1 rounded-full bg-muted-foreground/50" />
+          <span className="text-xs capitalize text-muted-foreground">
+            {active
+              ? `${active.slide.type === "standard" ? "title" : active.slide.type} scene`
+              : "No scene"}
+          </span>
+        </div>
+        <span className="rounded-lg border border-border bg-secondary/40 px-2.5 py-1.5 text-xs tabular-nums text-muted-foreground">
+          {settings.width} × {settings.height}
+        </span>
+      </div>
+
+      <div className="flex flex-1 items-center justify-center overflow-y-auto p-6 lg:p-8">
         <div className="w-full max-w-4xl">
           <div
-            className="relative rounded-lg overflow-hidden border border-border bg-black"
+            className="relative overflow-hidden rounded-[14px] border border-[#303137] bg-black shadow-[0_28px_90px_rgba(0,0,0,0.36),0_0_0_1px_rgba(255,255,255,0.015)]"
             style={{
               aspectRatio: `${settings.width} / ${settings.height}`,
             }}>
@@ -138,22 +155,22 @@ export const Preview = forwardRef<PreviewHandle>((_props, ref) => {
               className="absolute inset-0"
               style={{ width: "100%", height: "100%" }}>
               <SlideCanvas
-                slide={active ? active.slide : null}
-                localTime={active ? active.localTime : 0}
+                slides={slides}
+                currentTime={currentTime}
                 settings={settings}
                 isPlaying={isPlaying}
               />
               {!active && (
-                <div className="absolute inset-0 flex items-center justify-center text-muted-foreground text-sm pointer-events-none">
-                  Add slides to preview your video
+                <div className="absolute inset-0 flex items-center justify-center text-sm text-muted-foreground pointer-events-none">
+                  Add a scene to begin your story
                 </div>
               )}
             </div>
           </div>
 
           {totalDuration > 0 && (
-            <div className="flex items-center gap-3 mt-3">
-              <span className="text-[11px] text-muted-foreground tabular-nums w-12 text-right">
+            <div className="mt-4 flex items-center gap-3">
+              <span className="w-12 text-right text-xs text-muted-foreground tabular-nums">
                 {formatTime(
                   Math.round(currentTime * settings.fps),
                   settings.fps,
@@ -166,9 +183,10 @@ export const Preview = forwardRef<PreviewHandle>((_props, ref) => {
                 step={0.01}
                 value={currentTime}
                 onChange={(e) => setCurrentTime(Number(e.target.value))}
-                className="flex-1 h-1.5 appearance-none bg-secondary rounded-full cursor-pointer accent-foreground [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-3 [&::-webkit-slider-thumb]:h-3 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-foreground [&::-webkit-slider-thumb]:cursor-pointer"
+                aria-label="Video playhead"
+                className="h-1 flex-1 cursor-pointer appearance-none rounded-full bg-secondary accent-brand [&::-webkit-slider-thumb]:h-3 [&::-webkit-slider-thumb]:w-3 [&::-webkit-slider-thumb]:cursor-pointer [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:border-2 [&::-webkit-slider-thumb]:border-[#0d0e10] [&::-webkit-slider-thumb]:bg-brand"
               />
-              <span className="text-[11px] text-muted-foreground tabular-nums w-12">
+              <span className="w-12 text-xs text-muted-foreground tabular-nums">
                 {formatTime(
                   Math.round(totalDuration * settings.fps),
                   settings.fps,

@@ -1,4 +1,5 @@
-import type { Slide } from "../types";
+import type { Slide, TransitionType } from "../types";
+import { DEFAULT_TRANSITION } from "../types";
 
 export interface SlideTimeInfo {
   slide: Slide;
@@ -9,6 +10,25 @@ export interface SlideTimeInfo {
   localProgress: number;
 }
 
+export interface TimelineTransitionInfo {
+  type: Exclude<TransitionType, "cut">;
+  durationSeconds: number;
+  progress: number;
+}
+
+export interface TimelineFrameInfo {
+  active: SlideTimeInfo | null;
+  previous: SlideTimeInfo | null;
+  transition: TimelineTransitionInfo | null;
+}
+
+export function getEffectiveDuration(slide: Slide): number {
+  if (slide.type === "standard" || slide.type === "logo") {
+    return slide.durationSeconds + slide.delaySeconds;
+  }
+  return slide.durationSeconds;
+}
+
 export function getActiveSlide(
   slides: Slide[],
   currentTime: number,
@@ -17,10 +37,7 @@ export function getActiveSlide(
 
   for (let i = 0; i < slides.length; i++) {
     const slide = slides[i]!;
-    const effectiveDuration =
-      slide.type === "standard" || slide.type === "logo"
-        ? slide.durationSeconds + slide.delaySeconds
-        : slide.durationSeconds;
+    const effectiveDuration = getEffectiveDuration(slide);
 
     const start = cumulative;
     const end = cumulative + effectiveDuration;
@@ -46,10 +63,7 @@ export function getActiveSlide(
 
   if (slides.length > 0) {
     const lastSlide = slides[slides.length - 1]!;
-    const lastEffective =
-      lastSlide.type === "standard" || lastSlide.type === "logo"
-        ? lastSlide.durationSeconds + lastSlide.delaySeconds
-        : lastSlide.durationSeconds;
+    const lastEffective = getEffectiveDuration(lastSlide);
     return {
       slide: lastSlide,
       index: slides.length - 1,
@@ -63,11 +77,59 @@ export function getActiveSlide(
   return null;
 }
 
+export function getTimelineFrame(
+  slides: Slide[],
+  currentTime: number,
+): TimelineFrameInfo {
+  const active = getActiveSlide(slides, currentTime);
+  if (!active || active.index === 0) {
+    return { active, previous: null, transition: null };
+  }
+
+  const settings = active.slide.transition ?? DEFAULT_TRANSITION;
+  if (settings.type === "cut") {
+    return { active, previous: null, transition: null };
+  }
+
+  const configuredDuration = Number.isFinite(settings.durationSeconds)
+    ? settings.durationSeconds
+    : DEFAULT_TRANSITION.durationSeconds;
+  const durationSeconds = Math.min(
+    Math.max(0.1, configuredDuration),
+    Math.max(0, active.slide.durationSeconds),
+  );
+
+  if (
+    durationSeconds <= 0 ||
+    active.localTime < 0 ||
+    active.localTime >= durationSeconds
+  ) {
+    return { active, previous: null, transition: null };
+  }
+
+  const previousSlide = slides[active.index - 1]!;
+  const previousDuration = getEffectiveDuration(previousSlide);
+  const previousStart = active.startTime - previousDuration;
+  const previous: SlideTimeInfo = {
+    slide: previousSlide,
+    index: active.index - 1,
+    startTime: previousStart,
+    endTime: active.startTime,
+    localTime: previousSlide.durationSeconds,
+    localProgress: 1,
+  };
+
+  return {
+    active,
+    previous,
+    transition: {
+      type: settings.type,
+      durationSeconds,
+      progress: active.localTime / durationSeconds,
+    },
+  };
+}
+
 export function getTotalDuration(slides: Slide[]): number {
-  return slides.reduce((sum, s) => {
-    if (s.type === "standard" || s.type === "logo") {
-      return sum + s.durationSeconds + s.delaySeconds;
-    }
-    return sum + s.durationSeconds;
-  }, 0);
+  return slides.reduce((sum, slide) => sum + getEffectiveDuration(slide), 0);
 }

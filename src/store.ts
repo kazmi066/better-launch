@@ -8,6 +8,8 @@ import type {
   AudioTrack,
 } from "./types";
 import { DEFAULT_SETTINGS } from "./types";
+import { DEFAULT_TRANSITION } from "./types";
+import { DEFAULT_PROCEDURAL_BACKGROUND } from "./types";
 
 let idCounter = 0;
 export const newId = () => `slide-${++idCounter}-${Date.now()}`;
@@ -32,6 +34,8 @@ export function createStandardSlide(
     backgroundImageFileName: "",
     backgroundVideoUrl: "",
     backgroundVideoFileName: "",
+    ...DEFAULT_PROCEDURAL_BACKGROUND,
+    transition: { ...DEFAULT_TRANSITION },
     durationSeconds: 4,
     delaySeconds: 0,
     ...overrides,
@@ -49,6 +53,7 @@ export function createVideoSlide(overrides?: Partial<VideoSlide>): VideoSlide {
     sourceDurationSeconds: 0,
     trimStart: 0,
     trimEnd: 0,
+    transition: { ...DEFAULT_TRANSITION },
     ...overrides,
   };
 }
@@ -66,6 +71,7 @@ export function createLogoSlide(overrides?: Partial<LogoSlide>): LogoSlide {
     backgroundColor: "#09090b",
     textColor: "#ffffff",
     animation: "scale-pop",
+    transition: { ...DEFAULT_TRANSITION },
     durationSeconds: 3,
     delaySeconds: 0,
     ...overrides,

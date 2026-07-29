@@ -21,11 +21,14 @@ export const PositionGrid: React.FC<PositionGridProps> = ({
     {GRID.flat().map((pos) => (
       <button
         key={pos}
+        type="button"
+        aria-label={pos.replace("-", " ")}
+        aria-pressed={value === pos}
         onClick={() => onChange(pos)}
         className={cn(
-          "rounded-sm transition-all duration-150",
+          "rounded-sm transition-all duration-150 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring",
           value === pos
-            ? "bg-foreground scale-110"
+            ? "bg-brand scale-110"
             : "bg-secondary hover:bg-muted-foreground/30",
         )}
       />

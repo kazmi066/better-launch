@@ -45,7 +45,7 @@ function Waveform({
 
       <g
         fill="currentColor"
-        className="text-foreground"
+        className="text-brand"
         clipPath="url(#mt-played)">
         {peaks.map((p, i) => {
           const h = Math.max(2, p * 96);
@@ -105,7 +105,7 @@ export const MusicTrack: React.FC = () => {
       : 0;
 
   return (
-    <div className="border-t border-border bg-card/80 px-4 py-2">
+    <div className="flex h-full items-center bg-transparent px-4">
       <input
         ref={fileRef}
         type="file"
@@ -115,16 +115,21 @@ export const MusicTrack: React.FC = () => {
       />
 
       {!audioTrack && (
-        <div className="flex items-center gap-3">
-          <Music className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
-          <span className="text-[11px] text-muted-foreground tracking-tight">
-            Add a music track
+        <div className="flex w-full items-center gap-3">
+          <div className="grid h-8 w-8 place-items-center rounded-lg bg-secondary/70">
+            <Music className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
+          </div>
+          <span className="text-xs font-medium text-muted-foreground tracking-tight">
+            Soundtrack
+          </span>
+          <span className="hidden text-xs text-muted-foreground/70 lg:inline">
+            Add music to set the pace
           </span>
           <div className="flex-1" />
           <Button
             variant="outline"
             size="sm"
-            className="h-7 text-[11px]"
+            className="h-9 rounded-lg text-sm"
             onClick={onPick}
             disabled={loading}>
             {loading ? (
@@ -132,20 +137,22 @@ export const MusicTrack: React.FC = () => {
             ) : (
               <Upload className="w-3 h-3 mr-1" />
             )}
-            {loading ? "Decoding…" : "Upload Audio"}
+            {loading ? "Decoding…" : "Add audio"}
           </Button>
         </div>
       )}
 
       {audioTrack && (
-        <div className="flex items-center gap-3">
-          <Music className="w-3.5 h-3.5 text-foreground shrink-0" />
+        <div className="flex w-full items-center gap-3">
+          <div className="grid h-8 w-8 place-items-center rounded-lg bg-brand/10">
+            <Music className="w-3.5 h-3.5 text-brand shrink-0" />
+          </div>
 
           <div className="flex flex-col min-w-0 max-w-[160px]">
-            <span className="text-[11px] font-medium text-foreground truncate">
+            <span className="truncate text-sm font-medium text-foreground">
               {audioTrack.name}
             </span>
-            <span className="text-[10px] text-muted-foreground tabular-nums">
+            <span className="text-xs text-muted-foreground tabular-nums">
               {formatAudioDuration(audioTrack.duration)}
               {totalSeconds > audioTrack.duration && (
                 <span className="ml-1 text-muted-foreground/70">· loops</span>
@@ -173,7 +180,7 @@ export const MusicTrack: React.FC = () => {
                 updateAudioTrack({ volume: (v[0] ?? 100) / 100 })
               }
             />
-            <span className="text-[10px] tabular-nums text-muted-foreground w-7 text-right">
+            <span className="w-8 text-right text-xs tabular-nums text-muted-foreground">
               {Math.round(audioTrack.volume * 100)}
             </span>
           </div>
@@ -190,7 +197,7 @@ export const MusicTrack: React.FC = () => {
       )}
 
       {error && (
-        <div className="mt-1 text-[10px] text-destructive">{error}</div>
+        <div className="mt-1 text-xs text-destructive">{error}</div>
       )}
     </div>
   );

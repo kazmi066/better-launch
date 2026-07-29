@@ -1,7 +1,7 @@
 import { Muxer, ArrayBufferTarget } from "mp4-muxer";
 import type { AudioTrack, ProjectSettings, Slide } from "../types";
-import { getActiveSlide } from "../engine/renderer";
-import { renderScene } from "./scene";
+import { getTimelineFrame } from "../engine/renderer";
+import { renderTimelineFrame } from "./timeline-renderer";
 import {
   ensureImageLoaded,
   getOrCreateVideo,
@@ -56,13 +56,13 @@ async function preloadMedia(slides: Slide[]): Promise<void> {
         );
       }
       if (slide.backgroundType === "video" && slide.backgroundVideoUrl) {
-        const v = getOrCreateVideo(slide.backgroundVideoUrl);
+        const v = getOrCreateVideo(slide.backgroundVideoUrl, slide.id);
         v.pause();
         videoPromises.push(waitForVideoReady(v).catch(() => {}));
       }
     }
     if (slide.type === "video" && slide.videoUrl) {
-      const v = getOrCreateVideo(slide.videoUrl);
+      const v = getOrCreateVideo(slide.videoUrl, slide.id);
       v.pause();
       videoPromises.push(waitForVideoReady(v).catch(() => {}));
     }
@@ -74,39 +74,70 @@ async function preloadMedia(slides: Slide[]): Promise<void> {
   await Promise.all([...imagePromises, ...videoPromises]);
 }
 
-async function syncVideoFrames(
-  slides: Slide[],
-  currentTime: number,
+async function syncSlideVideoFrame(
+  slide: Slide,
+  localTime: number,
+  fps: number,
+  holdLastFrame: boolean,
 ): Promise<void> {
-  const active = getActiveSlide(slides, currentTime);
-  if (!active) return;
-
   const seeks: Promise<void>[] = [];
+  const frameOffset = holdLastFrame ? 1 / fps : 0;
 
-  if (active.slide.type === "standard") {
+  if (slide.type === "standard") {
     if (
-      active.slide.backgroundType === "video" &&
-      active.slide.backgroundVideoUrl
+      slide.backgroundType === "video" &&
+      slide.backgroundVideoUrl
     ) {
-      const v = getOrCreateVideo(active.slide.backgroundVideoUrl);
+      const v = getOrCreateVideo(slide.backgroundVideoUrl, slide.id);
       if (v.readyState >= 2 && Number.isFinite(v.duration) && v.duration > 0) {
-        const t = active.localTime % v.duration;
+        const t = Math.max(0, localTime - frameOffset) % v.duration;
         seeks.push(seekVideo(v, t).catch(() => {}));
       }
     }
-  } else if (active.slide.type === "video" && active.slide.videoUrl) {
-    const v = getOrCreateVideo(active.slide.videoUrl);
+  } else if (slide.type === "video" && slide.videoUrl) {
+    const v = getOrCreateVideo(slide.videoUrl, slide.id);
     if (v.readyState >= 2 && Number.isFinite(v.duration) && v.duration > 0) {
       // Map slide-local time onto the trimmed window. trimEnd of 0
       // means "no trim configured" — fall back to the source duration.
-      const slide = active.slide;
       const trimEnd = slide.trimEnd > 0 ? slide.trimEnd : v.duration;
-      const t = Math.min(slide.trimStart + active.localTime, trimEnd);
+      const lastFrame = Math.max(slide.trimStart, trimEnd - frameOffset);
+      const t = Math.min(slide.trimStart + localTime, lastFrame);
       seeks.push(seekVideo(v, t).catch(() => {}));
     }
   }
 
   await Promise.all(seeks);
+}
+
+async function syncVideoFrames(
+  slides: Slide[],
+  currentTime: number,
+  fps: number,
+): Promise<void> {
+  const frame = getTimelineFrame(slides, currentTime);
+  if (!frame.active) return;
+
+  const syncs = [
+    syncSlideVideoFrame(
+      frame.active.slide,
+      frame.active.localTime,
+      fps,
+      false,
+    ),
+  ];
+
+  if (frame.previous) {
+    syncs.push(
+      syncSlideVideoFrame(
+        frame.previous.slide,
+        frame.previous.localTime,
+        fps,
+        true,
+      ),
+    );
+  }
+
+  await Promise.all(syncs);
 }
 
 export async function exportVideo(options: ExportOptions): Promise<Blob> {
@@ -183,15 +214,9 @@ export async function exportVideo(options: ExportOptions): Promise<Blob> {
       if (videoError) throw videoError;
 
       const t = frame / fps;
-      const active = getActiveSlide(slides, t);
 
-      await syncVideoFrames(slides, t);
-      renderScene(
-        ctx,
-        active ? active.slide : null,
-        active ? active.localTime : 0,
-        size,
-      );
+      await syncVideoFrames(slides, t, fps);
+      renderTimelineFrame(ctx, slides, t, size);
 
       const videoFrame = new VideoFrame(canvas, {
         timestamp: Math.round(frame * (1_000_000 / fps)),

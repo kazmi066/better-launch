@@ -5,9 +5,13 @@ import type {
   TextAnimationType,
   TextPosition,
   BackgroundType,
+  BackgroundMotionDirection,
 } from "../../types";
-import { TEXT_ANIMATION_OPTIONS } from "../../types";
-import { Upload, X } from "lucide-react";
+import {
+  PROCEDURAL_BACKGROUND_OPTIONS,
+  TEXT_ANIMATION_OPTIONS,
+} from "../../types";
+import { RefreshCw, Upload, X } from "lucide-react";
 import { Input } from "../ui/input";
 import { Label } from "../ui/label";
 import { Button } from "../ui/button";
@@ -110,7 +114,14 @@ export const StandardSlideProps: React.FC<{ slide: StandardSlide }> = ({
   slide,
 }) => {
   const updateSlide = useProjectStore((s) => s.updateSlide);
-  const u = (patch: Partial<StandardSlide>) => updateSlide(slide.id, patch);
+  const u = useCallback(
+    (patch: Partial<StandardSlide>) => updateSlide(slide.id, patch),
+    [slide.id, updateSlide],
+  );
+  const proceduralOption = PROCEDURAL_BACKGROUND_OPTIONS.find(
+    (option) => option.value === slide.backgroundType,
+  );
+  const isProcedural = proceduralOption !== undefined;
 
   return (
     <div className="space-y-5">
@@ -143,7 +154,7 @@ export const StandardSlideProps: React.FC<{ slide: StandardSlide }> = ({
               <SelectItem key={o.value} value={o.value}>
                 <div>
                   <span>{o.label}</span>
-                  <span className="text-muted-foreground text-[10px] ml-2">
+                  <span className="ml-2 text-xs text-muted-foreground">
                     {o.description}
                   </span>
                 </div>
@@ -221,13 +232,31 @@ export const StandardSlideProps: React.FC<{ slide: StandardSlide }> = ({
         <Label>Background</Label>
         <Select
           value={slide.backgroundType}
-          onValueChange={(v) => u({ backgroundType: v as BackgroundType })}
+          onValueChange={(value) => {
+            const backgroundType = value as BackgroundType;
+            const enablingProcedural = PROCEDURAL_BACKGROUND_OPTIONS.some(
+              (option) => option.value === backgroundType,
+            );
+            u({
+              backgroundType,
+              ...(enablingProcedural &&
+              !isProcedural &&
+              slide.backgroundColor === "#09090b"
+                ? { backgroundColor: "#0b1020" }
+                : {}),
+            });
+          }}
         >
           <SelectTrigger>
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="color">Solid Color</SelectItem>
+            {PROCEDURAL_BACKGROUND_OPTIONS.map((option) => (
+              <SelectItem key={option.value} value={option.value}>
+                {option.label}
+              </SelectItem>
+            ))}
             <SelectItem value="image">Image</SelectItem>
             <SelectItem value="video">Video</SelectItem>
           </SelectContent>
@@ -272,6 +301,117 @@ export const StandardSlideProps: React.FC<{ slide: StandardSlide }> = ({
             }
           />
         </Field>
+      )}
+
+      {isProcedural && (
+        <div className="space-y-5 rounded-xl border border-brand/20 bg-brand/5 p-4">
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <p className="text-sm font-medium text-foreground">
+                {proceduralOption.label}
+              </p>
+              <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
+                {proceduralOption.description}
+              </p>
+            </div>
+            <span className="shrink-0 rounded-full border border-brand/25 bg-brand/10 px-2.5 py-1 text-xs text-brand">
+              Full quality
+            </span>
+          </div>
+
+          <ColorField
+            label="Base Color"
+            value={slide.backgroundColor}
+            onChange={(value) => u({ backgroundColor: value })}
+          />
+          <ColorField
+            label="Sky Color"
+            value={slide.backgroundSecondaryColor}
+            onChange={(value) => u({ backgroundSecondaryColor: value })}
+          />
+          <ColorField
+            label="Violet Color"
+            value={slide.backgroundAccentColor}
+            onChange={(value) => u({ backgroundAccentColor: value })}
+          />
+
+          <Field label="Motion Energy">
+            <div className="flex items-center gap-3">
+              <Slider
+                min={0}
+                max={1}
+                step={0.05}
+                value={[slide.backgroundEnergy]}
+                onValueChange={([value]) => {
+                  if (value !== undefined) u({ backgroundEnergy: value });
+                }}
+                className="flex-1"
+              />
+              <span className="w-12 text-right text-xs tabular-nums text-muted-foreground">
+                {Math.round(slide.backgroundEnergy * 100)}%
+              </span>
+            </div>
+          </Field>
+
+          <Field label="Field Scale">
+            <div className="flex items-center gap-3">
+              <Slider
+                min={0.7}
+                max={1.4}
+                step={0.05}
+                value={[slide.backgroundScale]}
+                onValueChange={([value]) => {
+                  if (value !== undefined) u({ backgroundScale: value });
+                }}
+                className="flex-1"
+              />
+              <span className="w-12 text-right text-xs tabular-nums text-muted-foreground">
+                {Math.round(slide.backgroundScale * 100)}%
+              </span>
+            </div>
+          </Field>
+
+          <Field label="Flow Direction">
+            <Select
+              value={slide.backgroundDirection}
+              onValueChange={(value) =>
+                u({
+                  backgroundDirection: value as BackgroundMotionDirection,
+                })
+              }>
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="forward">Forward</SelectItem>
+                <SelectItem value="reverse">Reverse</SelectItem>
+              </SelectContent>
+            </Select>
+          </Field>
+
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <p className="text-sm font-medium text-foreground">Variation</p>
+              <p className="mt-1 text-xs text-muted-foreground">
+                Deterministic seed {slide.backgroundSeed}
+              </p>
+            </div>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() =>
+                u({
+                  backgroundSeed:
+                    (Math.trunc(slide.backgroundSeed) + 1) % 10_000,
+                })
+              }
+              className="gap-2">
+              <RefreshCw className="h-3.5 w-3.5" />
+              New variation
+            </Button>
+          </div>
+        </div>
       )}
 
       <Separator />

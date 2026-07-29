@@ -256,7 +256,7 @@ export const VideoSlideProps: React.FC<{ slide: VideoSlide }> = ({ slide }) => {
               disabled={
                 slide.trimStart === 0 && slide.trimEnd === sourceDuration
               }
-              className="h-6 px-2 text-[10px] text-muted-foreground hover:text-foreground gap-1">
+              className="h-8 gap-1 px-2 text-xs text-muted-foreground hover:text-foreground">
               <RotateCcw className="w-3 h-3" />
               Reset
             </Button>
@@ -271,9 +271,9 @@ export const VideoSlideProps: React.FC<{ slide: VideoSlide }> = ({ slide }) => {
             onChange={handleTrimChange}
           />
 
-          <div className="grid grid-cols-3 gap-2 text-[11px]">
+          <div className="grid grid-cols-3 gap-2 text-xs">
             <div className="bg-secondary rounded-md px-2 py-1.5">
-              <p className="text-muted-foreground text-[10px] uppercase tracking-wider">
+              <p className="text-xs uppercase tracking-wide text-muted-foreground">
                 Start
               </p>
               <p className="text-foreground font-medium tabular-nums">
@@ -281,7 +281,7 @@ export const VideoSlideProps: React.FC<{ slide: VideoSlide }> = ({ slide }) => {
               </p>
             </div>
             <div className="bg-secondary rounded-md px-2 py-1.5">
-              <p className="text-muted-foreground text-[10px] uppercase tracking-wider">
+              <p className="text-xs uppercase tracking-wide text-muted-foreground">
                 End
               </p>
               <p className="text-foreground font-medium tabular-nums">
@@ -289,7 +289,7 @@ export const VideoSlideProps: React.FC<{ slide: VideoSlide }> = ({ slide }) => {
               </p>
             </div>
             <div className="bg-secondary rounded-md px-2 py-1.5">
-              <p className="text-muted-foreground text-[10px] uppercase tracking-wider">
+              <p className="text-xs uppercase tracking-wide text-muted-foreground">
                 Length
               </p>
               <p className="text-foreground font-medium tabular-nums">

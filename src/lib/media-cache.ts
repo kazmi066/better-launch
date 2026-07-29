@@ -40,8 +40,12 @@ export async function ensureImageLoaded(
   return img;
 }
 
-export function getOrCreateVideo(url: string): HTMLVideoElement {
-  const existing = videoCache.get(url);
+export function getOrCreateVideo(
+  url: string,
+  instanceKey: string = url,
+): HTMLVideoElement {
+  const cacheKey = `${instanceKey}\u0000${url}`;
+  const existing = videoCache.get(cacheKey);
   if (existing) return existing;
   const v = document.createElement("video");
   v.src = url;
@@ -49,7 +53,7 @@ export function getOrCreateVideo(url: string): HTMLVideoElement {
   v.playsInline = true;
   v.preload = "auto";
   v.crossOrigin = "anonymous";
-  videoCache.set(url, v);
+  videoCache.set(cacheKey, v);
   return v;
 }
 

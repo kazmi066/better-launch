@@ -69,10 +69,119 @@ export const POSITION_OPTIONS: { value: TextPosition; label: string }[] = [
 ];
 
 // ── Background types ─────────────────────────────────────────────────
-export type BackgroundType = "color" | "image" | "video";
+export type BackgroundType =
+  | "color"
+  | "image"
+  | "video"
+  | "gradient-mesh"
+  | "aurora"
+  | "technical-grid";
+
+export type BackgroundMotionDirection = "forward" | "reverse";
+
+export interface ProceduralBackgroundSettings {
+  backgroundSecondaryColor: string;
+  backgroundAccentColor: string;
+  backgroundEnergy: number;
+  backgroundScale: number;
+  backgroundDirection: BackgroundMotionDirection;
+  backgroundSeed: number;
+}
+
+export const PROCEDURAL_BACKGROUND_OPTIONS: {
+  value: Extract<
+    BackgroundType,
+    "gradient-mesh" | "aurora" | "technical-grid"
+  >;
+  label: string;
+  description: string;
+}[] = [
+  {
+    value: "gradient-mesh",
+    label: "Gradient Mesh",
+    description: "Layered fields of sky and violet light",
+  },
+  {
+    value: "aurora",
+    label: "Aurora",
+    description: "Soft flowing ribbons with cinematic depth",
+  },
+  {
+    value: "technical-grid",
+    label: "Technical Grid",
+    description: "A precise perspective field for product reveals",
+  },
+];
+
+export const DEFAULT_PROCEDURAL_BACKGROUND: ProceduralBackgroundSettings = {
+  backgroundSecondaryColor: "#7dd3fc",
+  backgroundAccentColor: "#c4b5fd",
+  backgroundEnergy: 0.55,
+  backgroundScale: 1,
+  backgroundDirection: "forward",
+  backgroundSeed: 7,
+};
+
+// ── Scene transitions ────────────────────────────────────────────────
+// Transitions belong to the incoming scene. They play during the first
+// `durationSeconds` of that scene, so the project duration never changes.
+export type TransitionType =
+  | "cut"
+  | "dissolve"
+  | "push-left"
+  | "wipe-left"
+  | "iris"
+  | "zoom-through";
+
+export interface TransitionSettings {
+  type: TransitionType;
+  durationSeconds: number;
+}
+
+export const TRANSITION_OPTIONS: {
+  value: TransitionType;
+  label: string;
+  description: string;
+}[] = [
+  {
+    value: "cut",
+    label: "Cut",
+    description: "Instant scene change with no overlap",
+  },
+  {
+    value: "dissolve",
+    label: "Dissolve",
+    description: "Smooth cinematic crossfade",
+  },
+  {
+    value: "push-left",
+    label: "Push",
+    description: "Both scenes travel left as one continuous frame",
+  },
+  {
+    value: "wipe-left",
+    label: "Wipe",
+    description: "The new scene reveals cleanly from the left",
+  },
+  {
+    value: "iris",
+    label: "Iris",
+    description: "A circular reveal opens from the center",
+  },
+  {
+    value: "zoom-through",
+    label: "Zoom Through",
+    description: "The outgoing scene expands into the next",
+  },
+];
+
+export const DEFAULT_TRANSITION: TransitionSettings = {
+  type: "cut",
+  durationSeconds: 0.6,
+};
 
 // ── Slide types ──────────────────────────────────────────────────────
-export interface StandardSlide {
+export interface StandardSlide extends ProceduralBackgroundSettings {
   type: "standard";
   id: string;
   heading: string;
@@ -87,6 +196,7 @@ export interface StandardSlide {
   backgroundImageFileName: string;
   backgroundVideoUrl: string;
   backgroundVideoFileName: string;
+  transition: TransitionSettings;
   durationSeconds: number;
   delaySeconds: number;
 }
@@ -103,6 +213,7 @@ export interface VideoSlide {
   sourceDurationSeconds: number;
   trimStart: number;
   trimEnd: number;
+  transition: TransitionSettings;
 }
 
 // ── Logo slide ──────────────────────────────────────────────────────
@@ -158,6 +269,7 @@ export interface LogoSlide {
   backgroundColor: string;
   textColor: string;
   animation: LogoAnimationType;
+  transition: TransitionSettings;
   durationSeconds: number;
   delaySeconds: number;
 }

@@ -111,7 +111,7 @@ export const LogoSlideProps: React.FC<{ slide: LogoSlide }> = ({ slide }) => {
             </Button>
           )}
         </div>
-        <p className="text-[10px] text-muted-foreground mt-1">
+        <p className="mt-1 text-xs text-muted-foreground">
           Tip: use a transparent PNG or SVG so the logo blends with the
           background.
         </p>

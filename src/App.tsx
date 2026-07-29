@@ -5,6 +5,8 @@ import { SlideList } from "./components/Timeline";
 import { PropertiesPanel } from "./components/PropertiesPanel";
 import { Preview, type PreviewHandle } from "./components/Preview";
 import { MusicTrack } from "./components/MusicTrack";
+import { BrandLockup } from "./components/BrandMark";
+import { LaunchIntro } from "./components/LaunchIntro";
 import {
   Play,
   Pause,
@@ -12,14 +14,13 @@ import {
   Download,
   Settings,
   Monitor,
-  Clapperboard,
   Info,
   X,
   CheckCircle2,
   AlertTriangle,
+  ChevronRight,
 } from "lucide-react";
 import { Button } from "./components/ui/button";
-import { Separator } from "./components/ui/separator";
 import {
   Dialog,
   DialogContent,
@@ -57,11 +58,11 @@ const StatCard: React.FC<{ label: string; value: string }> = ({
   label,
   value,
 }) => (
-  <div className="bg-secondary rounded-lg p-3">
-    <p className="text-[11px] text-muted-foreground uppercase tracking-wider">
+  <div className="rounded-xl border border-border/80 bg-secondary/60 p-3">
+    <p className="text-xs font-medium uppercase tracking-[0.08em] text-muted-foreground">
       {label}
     </p>
-    <p className="text-sm font-medium text-foreground mt-0.5">{value}</p>
+    <p className="mt-1 text-base font-medium text-foreground">{value}</p>
   </div>
 );
 
@@ -72,14 +73,15 @@ const TransportControls: React.FC<{
   onTogglePlay: () => void;
   onRestart: () => void;
 }> = ({ isPlaying, settings, totalSeconds, onTogglePlay, onRestart }) => (
-  <div className="flex items-center justify-center gap-2 mt-2">
+  <div className="flex h-14 items-center justify-center gap-2">
     <Tooltip>
       <TooltipTrigger asChild>
         <Button
           variant="ghost"
           size="icon"
           onClick={onRestart}
-          className="h-9 w-9 text-muted-foreground hover:text-foreground">
+          aria-label="Restart video"
+          className="h-8 w-8 rounded-full text-muted-foreground hover:text-foreground">
           <RotateCcw className="w-4 h-4" />
         </Button>
       </TooltipTrigger>
@@ -88,10 +90,15 @@ const TransportControls: React.FC<{
     <Button
       size="icon"
       onClick={onTogglePlay}
-      className="h-10 w-10 rounded-full">
-      {isPlaying ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4" />}
+      aria-label={isPlaying ? "Pause video" : "Play video"}
+      className="brand-button h-10 w-10 rounded-full">
+      {isPlaying ? (
+        <Pause className="w-3.5 h-3.5" />
+      ) : (
+        <Play className="ml-0.5 w-3.5 h-3.5" />
+      )}
     </Button>
-    <div className="flex items-center gap-1.5 ml-2 text-xs text-muted-foreground tabular-nums">
+    <div className="ml-2 flex items-center gap-1.5 text-xs text-muted-foreground tabular-nums">
       <Monitor className="w-3.5 h-3.5" />
       <span>
         {settings.width}×{settings.height} · {settings.fps}fps ·{" "}
@@ -117,7 +124,7 @@ const ExportActions: React.FC<{
           onClick={onExport}
           disabled={!isWebCodecsSupported() || totalFrames === 0}>
           <Download className="w-4 h-4 mr-2" />
-          Export as MP4
+          Render MP4
         </Button>
       );
     case "rendering":
@@ -227,10 +234,10 @@ const ExportDialog: React.FC<{
       <DialogHeader>
         <DialogTitle className="flex items-center gap-2">
           <Download className="w-4 h-4" />
-          Export Video
+          Render video
         </DialogTitle>
         <DialogDescription>
-          Render and download your launch video as MP4
+          Turn this story into a polished, shareable MP4.
         </DialogDescription>
       </DialogHeader>
       <div className="space-y-4 pt-2">
@@ -284,9 +291,9 @@ const SettingsDialog: React.FC<{
       <DialogHeader>
         <DialogTitle className="flex items-center gap-2">
           <Settings className="w-4 h-4" />
-          Project Settings
+          Project settings
         </DialogTitle>
-        <DialogDescription>Configure video output settings</DialogDescription>
+        <DialogDescription>Choose the format for your final cut.</DialogDescription>
       </DialogHeader>
       <div className="space-y-4 pt-2">
         <div className="space-y-2">
@@ -421,54 +428,64 @@ function App() {
 
   return (
     <TooltipProvider>
-      <div className="h-screen flex flex-col bg-background overflow-hidden">
-        <header className="flex items-center justify-between h-12 px-4 border-b border-border">
-          <div className="flex items-center gap-3">
-            <div className="flex items-center gap-2">
-              <Clapperboard className="w-4 h-4 text-foreground" />
-              <span className="text-sm font-semibold tracking-tight text-foreground">
-                BetterLaunch
+      <div className="app-shell h-screen overflow-hidden bg-background">
+        <LaunchIntro />
+
+        <header className="app-header">
+          <div className="flex min-w-0 items-center gap-4">
+            <BrandLockup />
+            <div className="hidden h-6 w-px bg-border lg:block" />
+            <div className="hidden min-w-0 items-center gap-2 lg:flex">
+              <span className="text-xs text-muted-foreground">Projects</span>
+              <ChevronRight className="h-3 w-3 text-muted-foreground/50" />
+              <span className="max-w-52 truncate text-xs font-medium text-foreground/85">
+                Untitled launch
               </span>
             </div>
-            <Separator orientation="vertical" className="h-4" />
-            <span className="text-xs text-muted-foreground">
-              Launch Video Maker
-            </span>
           </div>
-          <div className="flex items-center gap-1.5">
+
+          <div className="flex items-center gap-2">
+            <div className="mr-1 hidden items-center gap-2 rounded-full border border-border bg-secondary/40 px-3 py-2 text-xs text-muted-foreground xl:flex">
+              <span className="h-1.5 w-1.5 rounded-full bg-success" />
+              Local render
+            </div>
             <Button
               variant="ghost"
               size="sm"
               onClick={() => setShowSettings(true)}
-              className="h-8 text-xs text-muted-foreground">
+              className="h-10 rounded-lg px-3 text-sm text-muted-foreground">
               <Settings className="w-3.5 h-3.5 mr-1" />
               Settings
             </Button>
             <Button
               size="sm"
               onClick={() => setShowExport(true)}
-              className="h-8 text-xs">
+              className="brand-button h-10 rounded-lg px-4 text-sm">
               <Download className="w-3.5 h-3.5 mr-1" />
-              Export
+              Render video
             </Button>
           </div>
         </header>
 
-        <div className="flex-1 flex min-h-0">
-          <div className="w-72 border-r border-border shrink-0 overflow-hidden bg-card">
+        <main className="app-workspace">
+          <aside className="app-sidebar app-sidebar--left">
             <SlideList />
-          </div>
+          </aside>
 
-          <Preview ref={previewRef} />
+          <section className="app-stage">
+            <Preview ref={previewRef} />
+          </section>
 
-          <div className="w-80 border-l border-border shrink-0 overflow-hidden bg-card">
+          <aside className="app-sidebar app-sidebar--right">
             <PropertiesPanel />
-          </div>
+          </aside>
+        </main>
+
+        <div className="app-audio">
+          <MusicTrack />
         </div>
 
-        <MusicTrack />
-
-        <div className="border-t border-border bg-card px-4 py-2">
+        <div className="app-transport">
           <TransportControls
             isPlaying={isPlaying}
             settings={settings}

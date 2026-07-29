@@ -13,6 +13,7 @@ import { logoAnimations } from "../animations/logo";
 import type { AnimationRenderContext } from "../animations/types";
 import { getImageSync, getOrCreateVideo } from "./media-cache";
 import { clamp } from "./easing";
+import { renderProceduralBackground } from "./procedural-backgrounds";
 
 export interface SceneSize {
   width: number;
@@ -185,10 +186,23 @@ function renderStandardSlide(
     if (img) drawCover(ctx, img, img.naturalWidth, img.naturalHeight, size);
   } else if (slide.backgroundType === "video" && slide.backgroundVideoUrl) {
     drawColorBackground(ctx, "#000000", size);
-    const v = getOrCreateVideo(slide.backgroundVideoUrl);
+    const v = getOrCreateVideo(slide.backgroundVideoUrl, slide.id);
     if (v.readyState >= 2 && v.videoWidth > 0) {
       drawCover(ctx, v, v.videoWidth, v.videoHeight, size);
     }
+  } else if (
+    slide.backgroundType === "gradient-mesh" ||
+    slide.backgroundType === "aurora" ||
+    slide.backgroundType === "technical-grid"
+  ) {
+    renderProceduralBackground(
+      ctx,
+      slide.backgroundType,
+      localTime,
+      size,
+      slide.backgroundColor || "#09090b",
+      slide,
+    );
   } else {
     drawColorBackground(ctx, "#000000", size);
   }
@@ -229,7 +243,7 @@ function renderVideoSlide(
 ) {
   drawColorBackground(ctx, "#000000", size);
   if (!slide.videoUrl) return;
-  const v = getOrCreateVideo(slide.videoUrl);
+  const v = getOrCreateVideo(slide.videoUrl, slide.id);
   if (v.readyState >= 2 && v.videoWidth > 0) {
     const scale = Math.min(
       size.width / v.videoWidth,

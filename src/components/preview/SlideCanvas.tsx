@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import type { Slide, ProjectSettings, VideoSlide } from "../../types";
-import { renderScene } from "../../lib/scene";
+import { getTimelineFrame } from "../../engine/renderer";
+import { renderTimelineFrame } from "../../lib/timeline-renderer";
 import {
   ensureImageLoaded,
   getOrCreateVideo,
@@ -8,8 +9,8 @@ import {
 } from "../../lib/media-cache";
 
 interface Props {
-  slide: Slide | null;
-  localTime: number;
+  slides: Slide[];
+  currentTime: number;
   settings: ProjectSettings;
   isPlaying: boolean;
 }
@@ -22,119 +23,158 @@ function clampToTrim(absVideoTime: number, slide: VideoSlide): number {
   return absVideoTime;
 }
 
+function getSlideVideo(slide: Slide | null): HTMLVideoElement | null {
+  if (!slide) return null;
+  if (
+    slide.type === "standard" &&
+    slide.backgroundType === "video" &&
+    slide.backgroundVideoUrl
+  ) {
+    const video = getOrCreateVideo(slide.backgroundVideoUrl, slide.id);
+    video.loop = true;
+    video.muted = true;
+    return video;
+  }
+  if (slide.type === "video" && slide.videoUrl) {
+    return getOrCreateVideo(slide.videoUrl, slide.id);
+  }
+  return null;
+}
+
+function seekSlideVideo(
+  slide: Slide,
+  localTime: number,
+  fps: number,
+  holdLastFrame: boolean,
+) {
+  const video = getSlideVideo(slide);
+  if (!video || !video.duration || !Number.isFinite(video.duration)) return;
+
+  const frameOffset = holdLastFrame ? 1 / fps : 0;
+  if (slide.type === "standard") {
+    video.currentTime =
+      Math.max(0, localTime - frameOffset) % Math.max(video.duration, 0.001);
+    return;
+  }
+
+  if (slide.type === "video") {
+    const requested = clampToTrim(slide.trimStart + localTime, slide);
+    const trimEnd = slide.trimEnd > 0 ? slide.trimEnd : video.duration;
+    video.currentTime = Math.min(
+      requested,
+      Math.max(slide.trimStart, trimEnd - frameOffset),
+    );
+  }
+}
+
 export const SlideCanvas: React.FC<Props> = ({
-  slide,
-  localTime,
+  slides,
+  currentTime,
   settings,
   isPlaying,
 }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const tickRef = useRef(0);
-  // Bumps when a slide's async resource finishes loading. Listed as a
-  // dep on the paint effect so the canvas repaints once the asset is
-  // available — the previous `useReducer` counter wasn't a dep so
-  // freshly-loaded images silently failed to repaint.
   const [assetReadyTick, setAssetReadyTick] = useState(0);
 
+  const frame = getTimelineFrame(slides, currentTime);
+  const activeSlide = frame.active?.slide ?? null;
+  const activeLocalTime = frame.active?.localTime ?? 0;
+  const previousSlide = frame.previous?.slide ?? null;
+  const previousLocalTime = frame.previous?.localTime ?? 0;
+  const activeLocalTimeRef = useRef(activeLocalTime);
+  activeLocalTimeRef.current = activeLocalTime;
+
+  // Load resources for both halves of a transition before repainting.
   useEffect(() => {
-    if (!slide) return;
+    const targetSlides = [activeSlide, previousSlide].filter(
+      (slide, index, all): slide is Slide =>
+        !!slide && all.findIndex((candidate) => candidate?.id === slide.id) === index,
+    );
+    if (targetSlides.length === 0) return;
+
     let cancelled = false;
     const triggerIfAlive = () => {
-      if (!cancelled) setAssetReadyTick((x) => x + 1);
+      if (!cancelled) setAssetReadyTick((tick) => tick + 1);
     };
 
-    if (slide.type === "standard") {
-      if (slide.backgroundType === "image" && slide.backgroundImageUrl) {
-        ensureImageLoaded(slide.backgroundImageUrl)
+    for (const slide of targetSlides) {
+      if (slide.type === "standard") {
+        if (slide.backgroundType === "image" && slide.backgroundImageUrl) {
+          ensureImageLoaded(slide.backgroundImageUrl)
+            .then(triggerIfAlive)
+            .catch(() => {});
+        }
+        if (slide.backgroundType === "video" && slide.backgroundVideoUrl) {
+          const video = getOrCreateVideo(slide.backgroundVideoUrl, slide.id);
+          video.loop = true;
+          video.muted = true;
+          waitForVideoReady(video).then(triggerIfAlive).catch(() => {});
+        }
+      }
+
+      if (slide.type === "video" && slide.videoUrl) {
+        const video = getOrCreateVideo(slide.videoUrl, slide.id);
+        waitForVideoReady(video).then(triggerIfAlive).catch(() => {});
+      }
+
+      if (slide.type === "logo" && slide.logoImageUrl) {
+        ensureImageLoaded(slide.logoImageUrl)
           .then(triggerIfAlive)
           .catch(() => {});
       }
-      if (slide.backgroundType === "video" && slide.backgroundVideoUrl) {
-        const v = getOrCreateVideo(slide.backgroundVideoUrl);
-        v.loop = true;
-        v.muted = true;
-        waitForVideoReady(v)
-          .then(triggerIfAlive)
-          .catch(() => {});
-      }
-    }
-
-    if (slide.type === "video" && slide.videoUrl) {
-      const v = getOrCreateVideo(slide.videoUrl);
-      waitForVideoReady(v)
-        .then(triggerIfAlive)
-        .catch(() => {});
-    }
-
-    if (slide.type === "logo" && slide.logoImageUrl) {
-      ensureImageLoaded(slide.logoImageUrl)
-        .then(triggerIfAlive)
-        .catch(() => {});
     }
 
     return () => {
       cancelled = true;
     };
-  }, [
-    slide?.type,
-    slide?.type === "standard" ? slide.backgroundType : null,
-    slide?.type === "standard" ? slide.backgroundImageUrl : null,
-    slide?.type === "standard" ? slide.backgroundVideoUrl : null,
-    slide?.type === "video" ? slide.videoUrl : null,
-    slide?.type === "logo" ? slide.logoImageUrl : null,
-  ]);
+  }, [activeSlide, previousSlide]);
 
+  // Only the incoming scene can play video during a transition. The outgoing
+  // scene is held on its final full-quality frame.
   useEffect(() => {
-    if (!slide) return;
+    const activeVideo = getSlideVideo(activeSlide);
+    const previousVideo = getSlideVideo(previousSlide);
 
-    if (slide.type === "standard") {
-      if (slide.backgroundType === "video" && slide.backgroundVideoUrl) {
-        const v = getOrCreateVideo(slide.backgroundVideoUrl);
-        if (isPlaying) v.play().catch(() => {});
-        else v.pause();
-      }
-    }
+    if (previousVideo && previousVideo !== activeVideo) previousVideo.pause();
 
-    if (slide.type === "video" && slide.videoUrl) {
-      const v = getOrCreateVideo(slide.videoUrl);
-      if (isPlaying) {
-        // Re-anchor to the trim window before playing so a fresh play
-        // never picks up wherever the video element happened to be left.
-        if (v.duration && Number.isFinite(v.duration)) {
-          const target = clampToTrim(slide.trimStart + localTime, slide);
-          if (Math.abs(v.currentTime - target) > 0.05) v.currentTime = target;
-        }
-        v.play().catch(() => {});
-      } else {
-        v.pause();
-        if (v.duration && Number.isFinite(v.duration)) {
-          v.currentTime = clampToTrim(slide.trimStart + localTime, slide);
-        }
+    if (!activeVideo || !activeSlide) return;
+    if (isPlaying) {
+      if (activeSlide.type === "video") {
+        seekSlideVideo(
+          activeSlide,
+          activeLocalTimeRef.current,
+          settings.fps,
+          false,
+        );
       }
+      activeVideo.play().catch(() => {});
+    } else {
+      activeVideo.pause();
     }
   }, [
     isPlaying,
-    slide?.type,
-    slide?.type === "standard" ? slide.backgroundType : null,
-    slide?.type === "standard" ? slide.backgroundVideoUrl : null,
-    slide?.type === "video" ? slide.videoUrl : null,
-    slide?.type === "video" ? slide.trimStart : null,
-    slide?.type === "video" ? slide.trimEnd : null,
+    activeSlide,
+    previousSlide,
+    settings.fps,
   ]);
 
+  // Scrubbing and paused previews seek both buffers to deterministic frames.
   useEffect(() => {
-    if (!slide || slide.type !== "video" || !slide.videoUrl) return;
     if (isPlaying) return;
-    const v = getOrCreateVideo(slide.videoUrl);
-    if (!v.duration || !Number.isFinite(v.duration)) return;
-    v.currentTime = clampToTrim(slide.trimStart + localTime, slide);
+    if (activeSlide) {
+      seekSlideVideo(activeSlide, activeLocalTime, settings.fps, false);
+    }
+    if (previousSlide) {
+      seekSlideVideo(previousSlide, previousLocalTime, settings.fps, true);
+    }
   }, [
-    localTime,
+    activeSlide,
+    activeLocalTime,
+    previousSlide,
+    previousLocalTime,
     isPlaying,
-    slide?.type,
-    slide?.type === "video" ? slide.videoUrl : null,
-    slide?.type === "video" ? slide.trimStart : null,
-    slide?.type === "video" ? slide.trimEnd : null,
+    settings.fps,
   ]);
 
   useEffect(() => {
@@ -146,24 +186,17 @@ export const SlideCanvas: React.FC<Props> = ({
     const size = { width: settings.width, height: settings.height };
     if (canvas.width !== size.width) canvas.width = size.width;
     if (canvas.height !== size.height) canvas.height = size.height;
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = "high";
 
     const paint = () => {
-      renderScene(ctx, slide, localTime, size);
+      renderTimelineFrame(ctx, slides, currentTime, size);
     };
 
     paint();
 
-    // When a video source is playing we need per-frame drawImage so
-    // the canvas reflects the moving video.
-    const hasLiveVideo =
-      !!slide &&
-      isPlaying &&
-      ((slide.type === "standard" &&
-        slide.backgroundType === "video" &&
-        !!slide.backgroundVideoUrl) ||
-        (slide.type === "video" && !!slide.videoUrl));
-
-    if (hasLiveVideo) {
+    const activeVideo = getSlideVideo(activeSlide);
+    if (activeVideo && isPlaying) {
       const loop = () => {
         paint();
         tickRef.current = requestAnimationFrame(loop);
@@ -172,32 +205,31 @@ export const SlideCanvas: React.FC<Props> = ({
       return () => cancelAnimationFrame(tickRef.current);
     }
 
-    let videoEl: HTMLVideoElement | null = null;
-    if (slide?.type === "video" && slide.videoUrl) {
-      videoEl = getOrCreateVideo(slide.videoUrl);
-    } else if (
-      slide?.type === "standard" &&
-      slide.backgroundType === "video" &&
-      slide.backgroundVideoUrl
-    ) {
-      videoEl = getOrCreateVideo(slide.backgroundVideoUrl);
-    }
+    const videoElements = [activeVideo, getSlideVideo(previousSlide)].filter(
+      (video, index, all): video is HTMLVideoElement =>
+        !!video && all.indexOf(video) === index,
+    );
 
-    if (videoEl) {
-      const v = videoEl;
+    if (videoElements.length > 0) {
       const repaint = () => paint();
-      v.addEventListener("seeked", repaint);
-      v.addEventListener("loadeddata", repaint);
-      v.addEventListener("canplay", repaint);
+      for (const video of videoElements) {
+        video.addEventListener("seeked", repaint);
+        video.addEventListener("loadeddata", repaint);
+        video.addEventListener("canplay", repaint);
+      }
       return () => {
-        v.removeEventListener("seeked", repaint);
-        v.removeEventListener("loadeddata", repaint);
-        v.removeEventListener("canplay", repaint);
+        for (const video of videoElements) {
+          video.removeEventListener("seeked", repaint);
+          video.removeEventListener("loadeddata", repaint);
+          video.removeEventListener("canplay", repaint);
+        }
       };
     }
   }, [
-    slide,
-    localTime,
+    slides,
+    currentTime,
+    activeSlide,
+    previousSlide,
     settings.width,
     settings.height,
     isPlaying,
