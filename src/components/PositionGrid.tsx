@@ -28,7 +28,7 @@ export const PositionGrid: React.FC<PositionGridProps> = ({
         className={cn(
           "rounded-sm transition-all duration-150 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring",
           value === pos
-            ? "bg-brand scale-110"
+            ? "bg-foreground"
             : "bg-secondary hover:bg-muted-foreground/30",
         )}
       />

@@ -37,17 +37,6 @@ const slideLabel = (slide: Slide) => {
   }
 };
 
-const slideBorderColor = (type: Slide["type"]) => {
-  switch (type) {
-    case "standard":
-      return "border-l-[#7dd3fc]";
-    case "video":
-      return "border-l-[#a5b4fc]";
-    case "logo":
-      return "border-l-[#c4b5fd]";
-  }
-};
-
 const transitionLabel = (slide: Slide) => {
   const type = slide.transition?.type ?? "cut";
   return TRANSITION_OPTIONS.find((option) => option.value === type)?.label;
@@ -131,11 +120,10 @@ export const SlideList: React.FC = () => {
               key={slide.id}
               onClick={() => selectSlide(slide.id)}
               className={cn(
-                "group relative flex items-center gap-3 rounded-xl border border-transparent border-l-2 px-3 py-3 cursor-pointer transition-all",
-                slideBorderColor(slide.type),
+                "group relative flex items-center gap-3 rounded-xl border border-transparent border-l-2 px-3 py-3 cursor-pointer transition-colors",
                 isSelected
-                  ? "border-y-border border-r-border bg-secondary shadow-[0_6px_24px_rgba(0,0,0,0.12)]"
-                  : "hover:border-y-border/50 hover:border-r-border/50 hover:bg-secondary/45",
+                  ? "border-y-border border-r-border border-l-foreground bg-secondary"
+                  : "border-l-white/10 hover:border-y-border/60 hover:border-r-border/60 hover:bg-secondary/50",
               )}>
               <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-black/20 text-muted-foreground">
                 {slideIcon(slide.type)}
@@ -202,7 +190,7 @@ export const SlideList: React.FC = () => {
           variant="outline"
           size="sm"
           onClick={() => setShowAddMenu(!showAddMenu)}
-          className="h-10 w-full rounded-lg border-dashed text-sm text-muted-foreground hover:border-brand/60 hover:text-foreground">
+          className="h-10 w-full rounded-lg border-dashed text-sm text-muted-foreground hover:border-foreground/30 hover:text-foreground">
           <Plus className="w-3 h-3 mr-1" />
           Add scene
         </Button>

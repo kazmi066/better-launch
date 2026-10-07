@@ -45,7 +45,7 @@ function Waveform({
 
       <g
         fill="currentColor"
-        className="text-brand"
+        className="text-foreground"
         clipPath="url(#mt-played)">
         {peaks.map((p, i) => {
           const h = Math.max(2, p * 96);
@@ -144,8 +144,8 @@ export const MusicTrack: React.FC = () => {
 
       {audioTrack && (
         <div className="flex w-full items-center gap-3">
-          <div className="grid h-8 w-8 place-items-center rounded-lg bg-brand/10">
-            <Music className="w-3.5 h-3.5 text-brand shrink-0" />
+          <div className="grid h-8 w-8 place-items-center rounded-lg bg-secondary">
+            <Music className="w-3.5 h-3.5 text-foreground shrink-0" />
           </div>
 
           <div className="flex flex-col min-w-0 max-w-[160px]">

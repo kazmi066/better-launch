@@ -8,6 +8,7 @@ import React, {
 import { useProjectStore } from "../store";
 import { getActiveSlide } from "../engine/renderer";
 import { SlideCanvas } from "./preview/SlideCanvas";
+import { Playhead } from "./preview/Playhead";
 import { formatTime } from "../lib/utils";
 
 export interface PreviewHandle {
@@ -29,6 +30,8 @@ export const Preview = forwardRef<PreviewHandle>((_props, ref) => {
   const audioRef = useRef<HTMLAudioElement>(null);
   const rafRef = useRef<number>(0);
   const lastTickRef = useRef<number>(0);
+  const scrubbingRef = useRef(false);
+  const totalDurationRef = useRef(0);
 
   // Keep volume in sync whenever the user drags the slider.
   useEffect(() => {
@@ -69,20 +72,27 @@ export const Preview = forwardRef<PreviewHandle>((_props, ref) => {
     }
     return sum + s.durationSeconds;
   }, 0);
-  const active = getActiveSlide(slides, currentTime);
+  totalDurationRef.current = totalDuration;
+  const shownTime = Math.min(Math.max(currentTime, 0), totalDuration);
+  const active = getActiveSlide(slides, shownTime);
 
   const tick = useCallback(() => {
+    const store = useProjectStore.getState();
+
+    // A queued frame can still run after the user grabs the playhead.
+    // Playback must not move the time out from under that gesture.
+    if (scrubbingRef.current) {
+      lastTickRef.current = performance.now();
+      if (store.isPlaying) rafRef.current = requestAnimationFrame(tick);
+      return;
+    }
+    if (!store.isPlaying) return;
+
     const now = performance.now();
     const delta = (now - lastTickRef.current) / 1000;
     lastTickRef.current = now;
 
-    const store = useProjectStore.getState();
-    const total = store.slides.reduce((sum, s) => {
-      if (s.type === "standard" || s.type === "logo") {
-        return sum + s.durationSeconds + s.delaySeconds;
-      }
-      return sum + s.durationSeconds;
-    }, 0);
+    const total = totalDurationRef.current;
     const next = store.currentTime + delta;
 
     if (next >= total) {
@@ -105,12 +115,39 @@ export const Preview = forwardRef<PreviewHandle>((_props, ref) => {
     return () => cancelAnimationFrame(rafRef.current);
   }, [isPlaying, tick]);
 
+  const commitTime = useCallback((time: number) => {
+    const store = useProjectStore.getState();
+    // Keyboard and other one-shot seeks are not inside a drag, so they
+    // have to pause here. A drag already paused when it started.
+    if (!scrubbingRef.current && store.isPlaying) store.setIsPlaying(false);
+    if (!Number.isFinite(time)) return;
+    const total = Math.max(0, totalDurationRef.current);
+    const next = Math.min(Math.max(0, time), total);
+    if (Object.is(next, store.currentTime)) return;
+    store.setCurrentTime(next);
+  }, []);
+
+  const onScrubbingChange = useCallback((scrubbing: boolean) => {
+    scrubbingRef.current = scrubbing;
+    lastTickRef.current = performance.now();
+    if (!scrubbing) return;
+    cancelAnimationFrame(rafRef.current);
+    const store = useProjectStore.getState();
+    if (store.isPlaying) store.setIsPlaying(false);
+  }, []);
+
+  useEffect(() => {
+    if (currentTime > totalDuration) setCurrentTime(totalDuration);
+    else if (currentTime < 0 || !Number.isFinite(currentTime)) setCurrentTime(0);
+  }, [currentTime, totalDuration, setCurrentTime]);
+
   useImperativeHandle(ref, () => ({
     play: () => {
-      if (currentTime >= totalDuration) {
-        setCurrentTime(0);
+      const store = useProjectStore.getState();
+      if (store.currentTime >= totalDurationRef.current) {
+        store.setCurrentTime(0);
       }
-      setIsPlaying(true);
+      store.setIsPlaying(true);
     },
     pause: () => setIsPlaying(false),
     seekTo: (seconds: number) => setCurrentTime(seconds),
@@ -146,7 +183,7 @@ export const Preview = forwardRef<PreviewHandle>((_props, ref) => {
       <div className="flex flex-1 items-center justify-center overflow-y-auto p-6 lg:p-8">
         <div className="w-full max-w-4xl">
           <div
-            className="relative overflow-hidden rounded-[14px] border border-[#303137] bg-black shadow-[0_28px_90px_rgba(0,0,0,0.36),0_0_0_1px_rgba(255,255,255,0.015)]"
+            className="relative overflow-hidden rounded-xl border border-white/10 bg-black shadow-[0_18px_50px_rgba(0,0,0,0.45)]"
             style={{
               aspectRatio: `${settings.width} / ${settings.height}`,
             }}>
@@ -171,20 +208,17 @@ export const Preview = forwardRef<PreviewHandle>((_props, ref) => {
           {totalDuration > 0 && (
             <div className="mt-4 flex items-center gap-3">
               <span className="w-12 text-right text-xs text-muted-foreground tabular-nums">
-                {formatTime(
-                  Math.round(currentTime * settings.fps),
-                  settings.fps,
-                )}
+                {formatTime(Math.round(shownTime * settings.fps), settings.fps)}
               </span>
-              <input
-                type="range"
-                min={0}
-                max={totalDuration}
-                step={0.01}
-                value={currentTime}
-                onChange={(e) => setCurrentTime(Number(e.target.value))}
-                aria-label="Video playhead"
-                className="h-1 flex-1 cursor-pointer appearance-none rounded-full bg-secondary accent-brand [&::-webkit-slider-thumb]:h-3 [&::-webkit-slider-thumb]:w-3 [&::-webkit-slider-thumb]:cursor-pointer [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:border-2 [&::-webkit-slider-thumb]:border-[#0d0e10] [&::-webkit-slider-thumb]:bg-brand"
+              <Playhead
+                currentTime={shownTime}
+                duration={totalDuration}
+                fps={settings.fps}
+                onSeek={commitTime}
+                onNudge={(delta) =>
+                  commitTime(useProjectStore.getState().currentTime + delta)
+                }
+                onScrubbingChange={onScrubbingChange}
               />
               <span className="w-12 text-xs text-muted-foreground tabular-nums">
                 {formatTime(

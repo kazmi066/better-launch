@@ -52,7 +52,7 @@ export const TransitionControls: React.FC<TransitionControlsProps> = ({
           </p>
         </div>
         {!isFirstScene && (
-          <span className="shrink-0 rounded-full border border-brand/25 bg-brand/10 px-2.5 py-1 text-xs text-brand">
+          <span className="shrink-0 rounded-full border border-border bg-secondary px-2.5 py-1 text-xs text-foreground">
             Full quality
           </span>
         )}

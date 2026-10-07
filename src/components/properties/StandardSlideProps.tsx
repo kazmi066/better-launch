@@ -304,7 +304,7 @@ export const StandardSlideProps: React.FC<{ slide: StandardSlide }> = ({
       )}
 
       {isProcedural && (
-        <div className="space-y-5 rounded-xl border border-brand/20 bg-brand/5 p-4">
+        <div className="space-y-5 rounded-xl border border-border bg-secondary/60 p-4">
           <div className="flex items-start justify-between gap-3">
             <div>
               <p className="text-sm font-medium text-foreground">
@@ -314,7 +314,7 @@ export const StandardSlideProps: React.FC<{ slide: StandardSlide }> = ({
                 {proceduralOption.description}
               </p>
             </div>
-            <span className="shrink-0 rounded-full border border-brand/25 bg-brand/10 px-2.5 py-1 text-xs text-brand">
+            <span className="shrink-0 rounded-full border border-border bg-secondary px-2.5 py-1 text-xs text-foreground">
               Full quality
             </span>
           </div>
